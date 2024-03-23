@@ -8,6 +8,8 @@ import orjson
 from loguru import logger
 from pydantic import BaseModel, BeforeValidator, Discriminator, Field, ValidationError
 
+from tqdm import tqdm
+
 T = TypeVar("T")
 
 
@@ -38,10 +40,10 @@ class Paragraph(BaseModel):
     section: str | None
     sec_number: str
     sec_type: str
-    content_type: str
+    content_type: Literal["paragraph", "proof", "list"]
     text: str
-    # cite_spans: list[Span]
-    # ref_spans: list[Span]
+    cite_spans: list[Span]
+    ref_spans: list[Span]
 
 
 class ArticleId(BaseModel):
@@ -175,11 +177,71 @@ class NdjsonReader(Generic[BaseModelT]):
                     logger.error(e)
 
 
+def to_markdown(paper: Paper) -> list[str]:
+    inlined_texts = []
+
+    section_title = None
+
+    for paragraph in paper.body_text:
+        # Skip the proofs
+        if paragraph.content_type == "proof" or paragraph.content_type == "list":
+            continue
+
+        if paragraph.section and (
+            paragraph.section.startswith("Appendix")
+            or paragraph.section.startswith("Supplementary")
+            or paragraph.section.startswith("Acknowledgements")
+            or paragraph.section.startswith("References")
+            or paragraph.section.startswith("Proof")
+        ):
+            continue
+
+        if paragraph.text.startswith("Lemma") or paragraph.text.startswith("Theorem"):
+            continue
+
+        # Sort the spans by start position in reverse order
+        spans = sorted(
+            paragraph.cite_spans + paragraph.ref_spans,
+            key=lambda s: s.end,
+            reverse=True,
+        )
+
+        text = paragraph.text
+
+        for span in spans:
+            # Get the reference text based on the span type
+            if span.ref_id in paper.ref_entries:
+                # ref_text = paper.ref_entries[span.ref_id].latex
+                ref = paper.ref_entries[span.ref_id]
+                if ref.type == "formula":
+                    ref_text = f"${ref.latex}$".strip()
+                elif ref.type == "figure":
+                    ref_text = f"<figure> {ref.caption}"
+                elif ref.type == "table":
+                    ref_text = f"<table> {ref.caption}"
+            elif span.ref_id in paper.bib_entries:
+                ref_text = ""
+            else:
+                continue
+
+            # Replace the span text with the reference text
+            text = text[: span.start] + ref_text + text[span.end :]
+
+        # Remove the formula placeholders
+        if paragraph.section and paragraph.section != section_title:
+            inlined_texts.append(f"# {paragraph.section}\n{text}")
+            section_title = paragraph.section
+        else:
+            inlined_texts.append(text)
+
+    return inlined_texts
+
+
 with NdjsonReader(
     Path("data/raw/unarXive_data_sample/arXiv_src_2212_086.jsonl"), Paper, validate=True
 ) as f:
     try:
-        for i, line in enumerate(f):
-            print(line.model_dump_json(exclude_none=True))
+        for i, paper in tqdm(enumerate(f)):
+            inlined_texts = to_markdown(paper)
     except ValidationError:
         print(traceback.format_exc())
