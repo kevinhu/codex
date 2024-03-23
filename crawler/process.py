@@ -1,12 +1,13 @@
 # %%
 from os import PathLike
 from pathlib import Path
-import traceback
 from types import TracebackType
 from typing import Annotated, Any, Generic, Iterator, Literal, Optional, Type, TypeVar
+import click
 import orjson
 from loguru import logger
-from pydantic import BaseModel, BeforeValidator, Discriminator, Field, ValidationError
+from pydantic import BaseModel, BeforeValidator, Discriminator, Field
+import multiprocessing
 
 from tqdm import tqdm
 
@@ -40,33 +41,77 @@ class Paragraph(BaseModel):
     section: str | None
     sec_number: str
     sec_type: str
-    content_type: Literal["paragraph", "proof", "list"]
+    # content_type: Literal[
+    #     "paragraph",
+    #     "proof",
+    #     "list",
+    #     "picture",
+    #     "item",
+    #     "label",
+    #     "line",
+    #     "theindex",
+    #     "hi",
+    #     "alt_head",
+    #     "listing",
+    #     "pic-put",
+    #     "marginpar",
+    #     "headings",
+    #     "cleardoublepage",
+    #     "References",
+    #     "minipage",
+    #     "Metadata",
+    #     "epigraph",
+    #     "fixfoot",
+    #     "reference",
+    #     "epitext",
+    #     "FiXme",
+    #     "References.",
+    #     "REFERENCES",
+    #     "abstract",
+    #     "pic-frame",
+    #     "mbox",
+    #     "anchor",
+    #     "Ovalbox",
+    #     "R",
+    #     "listoftables",
+    #     "listoffigures",
+    #     "hfill",
+    #     "vfilneg",
+    #     "samepage",
+    #     "Reference",
+    #     "maketitle",
+    #     "xref",
+    #     "TeX",
+    #     "LaTeX",
+    #     "pic-multiput",
+    # ]
+    content_type: str
     text: str
     cite_spans: list[Span]
     ref_spans: list[Span]
 
 
 class ArticleId(BaseModel):
-    open_alex_id: FalsyToNone[str]
-    arxiv_id: FalsyToNone[str]
-    pubmed_id: FalsyToNone[str]
-    pmc_id: FalsyToNone[str]
-    doi: FalsyToNone[str]
-    arxiv_id: FalsyToNone[str]
+    open_alex_id: FalsyToNone[str] = None
+    arxiv_id: FalsyToNone[str] = None
+    pubmed_id: FalsyToNone[str] = None
+    pmc_id: FalsyToNone[str] = None
+    doi: FalsyToNone[str] = None
+    arxiv_id: FalsyToNone[str] = None
 
 
 class EmbeddedArxiv(BaseModel):
     id: str
-    text: str
-    start: int
-    end: int
+    text: str | None = None
+    start: int | None = None
+    end: int | None = None
 
 
 class EmbeddedLink(BaseModel):
     url: str
-    text: str
-    start: int
-    end: int
+    text: str | None = None
+    start: int | None = None
+    end: int | None = None
 
 
 class BibEntry(BaseModel):
@@ -94,12 +139,12 @@ class TableRefEntry(BaseModel):
 
 class Metadata(BaseModel):
     id: str
-    submitter: str
+    submitter: str | None = None
     authors: str
     title: str
     # comments: str
     journal_ref: Optional[str] = Field(None, alias="journal-ref")
-    doi: Optional[str]
+    doi: Optional[str] = Field(None, alias="doi")
     report_no: Optional[str] = Field(None, alias="report-no")
     categories: str
     license: str
@@ -177,14 +222,24 @@ class NdjsonReader(Generic[BaseModelT]):
                     logger.error(e)
 
 
-def to_markdown(paper: Paper) -> list[str]:
-    inlined_texts = []
+class InlinedParagraph(BaseModel):
+    section: str | None = None
+    text: str
 
-    section_title = None
+
+def inline(paper: Paper) -> list[InlinedParagraph]:
+    inlined_texts: list[InlinedParagraph] = []
+
+    # section_title = None
 
     for paragraph in paper.body_text:
         # Skip the proofs
-        if paragraph.content_type == "proof" or paragraph.content_type == "list":
+        if paragraph.content_type in [
+            "proof",
+            "list",
+            "picture",
+            "item",
+        ]:
             continue
 
         if paragraph.section and (
@@ -214,11 +269,11 @@ def to_markdown(paper: Paper) -> list[str]:
                 # ref_text = paper.ref_entries[span.ref_id].latex
                 ref = paper.ref_entries[span.ref_id]
                 if ref.type == "formula":
-                    ref_text = f"${ref.latex}$".strip()
+                    ref_text = f"${ref.latex.strip()}$"
                 elif ref.type == "figure":
-                    ref_text = f"<figure> {ref.caption}"
+                    ref_text = f"<figure> {ref.caption.strip()}"
                 elif ref.type == "table":
-                    ref_text = f"<table> {ref.caption}"
+                    ref_text = f"<table> {ref.caption.strip()}"
             elif span.ref_id in paper.bib_entries:
                 ref_text = ""
             else:
@@ -228,20 +283,89 @@ def to_markdown(paper: Paper) -> list[str]:
             text = text[: span.start] + ref_text + text[span.end :]
 
         # Remove the formula placeholders
-        if paragraph.section and paragraph.section != section_title:
-            inlined_texts.append(f"# {paragraph.section}\n{text}")
-            section_title = paragraph.section
-        else:
-            inlined_texts.append(text)
+        # if paragraph.section and paragraph.section != section_title:
+        # inlined_texts.append(f"# {paragraph.section}\n{text}")
+        # section_title = paragraph.section
+        # else:
+        # inlined_texts.append(text)
+
+        inline_paragraph = InlinedParagraph(section=paragraph.section, text=text)
+        inlined_texts.append(inline_paragraph)
 
     return inlined_texts
 
 
-with NdjsonReader(
-    Path("data/raw/unarXive_data_sample/arXiv_src_2212_086.jsonl"), Paper, validate=True
-) as f:
-    try:
-        for i, paper in tqdm(enumerate(f)):
-            inlined_texts = to_markdown(paper)
-    except ValidationError:
-        print(traceback.format_exc())
+class ProcessedPaper(BaseModel):
+    paper_id: str
+    metadata: Metadata
+    discipline: str
+    abstract: Abstract
+    bib_entries: dict[str, BibEntry]
+    inlined_texts: list[InlinedParagraph]
+
+
+def process_path(path: Path):
+    output_path = Path("data/processed/inlined_papers") / path.name
+
+    with open(output_path, "w") as f_out:
+        with NdjsonReader(path, Paper, validate=True) as f:
+            for paper in f:
+                try:
+                    inlined_texts = inline(paper)
+                except Exception as e:
+                    logger.error(f"Error processing {paper.paper_id}")
+                    logger.error(e)
+                    continue
+                processed_paper = ProcessedPaper(
+                    paper_id=paper.paper_id,
+                    metadata=paper.metadata,
+                    discipline=paper.discipline,
+                    abstract=paper.abstract,
+                    bib_entries=paper.bib_entries,
+                    inlined_texts=inlined_texts,
+                )
+                # yield processed_paper
+                f_out.write(processed_paper.model_dump_json(exclude_none=True))
+                f_out.write("\n")
+
+    return output_path
+
+
+@click.group()
+def cli():
+    pass
+
+
+@cli.command()
+def process():
+    paths = list(Path("data/raw/unarXive_230324_open_subset").rglob("*.jsonl"))
+
+    logger.info(f"Processing {len(paths)} files")
+    with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+        for p in tqdm(pool.imap_unordered(process_path, paths)):
+            logger.info(f"Wrote {p}")
+
+
+@cli.command()
+def merge():
+    processed_paths = list(Path("data/processed/inlined_papers").rglob("*.jsonl"))
+    with open("data/processed/inlined_papers.jsonl", "w") as f_out:
+        for path in tqdm(processed_paths, desc="Merging"):
+            with open(path, "r") as f:
+                for line in f:
+                    f_out.write(line)
+
+
+@cli.command()
+def filter():
+    with NdjsonReader(
+        Path("data/processed/inlined_papers.jsonl"), ProcessedPaper, validate=True
+    ) as r, open("data/processed/cs_inlined_papers.jsonl", "w") as w:
+        for paper in tqdm(r, desc="Filtering"):
+            if paper.metadata.categories.startswith("cs."):
+                w.write(paper.model_dump_json(exclude_none=True))
+                w.write("\n")
+
+
+if __name__ == "__main__":
+    cli()
