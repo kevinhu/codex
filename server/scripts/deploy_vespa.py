@@ -18,6 +18,12 @@ app_package.schema.add_fields(
         index="enable-bm25",
     ),
     Field(
+        name="slug",
+        type="string",
+        indexing=["index", "summary"],
+        index="enable-bm25",
+    ),
+    Field(
         name="description",
         type="string",
         indexing=["index", "summary"],
@@ -27,7 +33,7 @@ app_package.schema.add_fields(
 
 # %%
 app_package.schema.add_field_set(
-    FieldSet(name="default", fields=["name", "description"])
+    FieldSet(name="default", fields=["name", "slug", "description"])
 )
 
 # %%

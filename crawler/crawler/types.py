@@ -393,6 +393,9 @@ class PaperAnalysisResponse(BaseModel):
             
         return self
 
+    def all_topics(self):
+        return self.tasks + self.benchmarks + self.architectures + self.models + self.methods + self.datasets
+
 class ProcessedFinding(BaseModel):
     slug: str
     name: str
