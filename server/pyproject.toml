@@ -9,6 +9,8 @@ readme = "README.md"
 python = "^3.9"
 fastapi = {extras = ["all"], version = "^0.110.0"}
 psycopg = "^3.1.18"
+pyvespa = "^0.39.0"
+ipykernel = "^6.29.3"
 
 
 [build-system]
