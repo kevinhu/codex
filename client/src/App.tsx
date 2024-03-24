@@ -1,31 +1,38 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
+
+export interface Entity {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  is_primary: boolean;
+  created_at: string;
+}
 
 function App() {
   const [query, setQuery] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<
-    {
-      id: string;
-      name: string;
-    }[]
-  >([]);
+  const [searchResults, setSearchResults] = useState<Entity[]>([]);
 
   useEffect(() => {
     if (query.length === 0) {
       setSearchResults([]);
       return;
     }
-
-    setSearchResults([
-      {
-        id: "1",
-        name: "Result 1",
-      },
-      {
-        id: "2",
-        name: "Result 2",
-      },
-    ]);
+    try {
+      axios
+        .get(`http://localhost:8000/search`, {
+          params: {
+            query,
+          },
+        })
+        .then((response) => {
+          setSearchResults(response.data);
+        });
+    } catch (error) {
+      console.error(error);
+    }
   }, [query]);
 
   return (
@@ -42,7 +49,7 @@ function App() {
         />
         <div className="border border-gray-300 rounded px-2 py-1 bg-gray-50 flex flex-col">
           {searchResults.map((result) => (
-            <Link key={result.id} to={result.id}>
+            <Link key={result.id} to={`/${result.id}`}>
               {result.name}
             </Link>
           ))}
