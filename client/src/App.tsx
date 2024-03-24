@@ -94,13 +94,14 @@ function App() {
         </h1>
         <div className="text-xl">
           <h2>
-            <span className="font-bold font-mono">53339</span> papers indexed
+            <span className="font-bold font-mono">53,339</span> papers indexed
           </h2>
           <h2>
-            <span className="font-bold font-mono">X</span> topics covered
+            <span className="font-bold font-mono">130,427</span> topics covered
           </h2>
           <h2>
-            <span className="font-bold font-mono">Y</span> findings
+            <span className="font-bold font-mono">165,131 discovered</span>{" "}
+            findings
           </h2>
         </div>
         <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">

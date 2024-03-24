@@ -33,13 +33,11 @@ async def read_topic(topic_id: str):
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    SELECT * FROM topic WHERE id = '{topic_id}';
+                    SELECT * FROM resolved_topic WHERE id = '{topic_id}';
                     """
                 )
 
                 response = cur.fetchall()
-
-                print("topic_id", topic_id, response)
 
                 topic = response[0]
 
@@ -54,6 +52,47 @@ async def read_topic(topic_id: str):
                 )
 
                 findings = cur.fetchall()
+
+                depth = 2
+
+                cur.execute(
+                    f"""
+WITH RECURSIVE related_data AS (
+    -- Initial selection from resolved_topic
+    SELECT 'resolved_topic' as type, rt.id, 1 AS depth
+    FROM resolved_topic rt
+    WHERE rt.id = '{topic_id}'
+
+    UNION ALL
+
+    -- Recursive part: Findings related to resolved_topics, then resolved_topics related to findings
+    SELECT 
+        CASE 
+            WHEN rd.type = 'resolved_topic' THEN 'finding'
+            ELSE 'resolved_topic'
+        END as type,
+        CASE 
+            WHEN rd.type = 'resolved_topic' THEN tf.finding_id
+            ELSE tf.resolved_topic_id
+        END as id,
+        rd.depth + 1 AS depth
+    FROM related_data rd
+    JOIN topic_finding tf ON 
+        (rd.type = 'resolved_topic' AND tf.resolved_topic_id = rd.id) OR 
+        (rd.type = 'finding' AND tf.finding_id = rd.id)
+    WHERE rd.depth < your_N_value
+)
+SELECT type, id FROM related_data
+WHERE depth <= {depth}
+ORDER BY depth, type, id;
+                    """
+                )
+
+                related_data = cur.fetchall()
+
+                print(related_data)
+
+                # Get all topics and findings N nested levels deep
 
                 return {**topic, "findings": findings}
 
