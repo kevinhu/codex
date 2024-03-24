@@ -17,6 +17,11 @@ export interface Topic {
 
 export interface TopicWithFindings extends Topic {
   findings: Finding[];
+  n_deep_data: {
+    type: string;
+    id: string;
+    edge: string | null;
+  }[];
 }
 
 export interface Finding {

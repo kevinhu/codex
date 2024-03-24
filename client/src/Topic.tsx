@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import MistralClient from "@mistralai/mistralai";
 import { useLocalStorage } from "usehooks-ts";
@@ -8,38 +8,64 @@ import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { ForceGraph3D } from "react-force-graph";
-import SpriteText from "three-spritetext";
+// import SpriteText from "three-spritetext";
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [graphData, setGraphData] = useState<{
+    nodes: { id: string; color: string; type: string }[];
+    links: { source: string; target: string }[];
+  } | null>(null);
 
-  const findings_map =
-    entity?.findings?.map((finding) => ({
-      id: finding.id || "",
-      name: finding.name,
-      color: "red",
-      type: "finding",
-    })) || [];
+  useEffect(() => {
+    const n_deep_data = entity?.n_deep_data;
 
-  const graphData = {
-    nodes: [
-      {
-        id: entity?.id || "",
-        name: entity?.name || "",
-        color: "blue",
-        type: "topic",
-      },
-      ...findings_map,
-    ],
-    links:
-      entity?.findings?.map((finding) => ({
-        source: entity.id,
-        target: finding.id,
-      })) || [],
-  };
+    const uniqueMap = new Map<string, object>();
+    if (n_deep_data) {
+      for (const obj of n_deep_data) {
+        if (!uniqueMap.has(obj.id)) {
+          uniqueMap.set(obj.id, obj);
+        }
+      }
+    }
+    const nodes = Array.from(uniqueMap.values()) as {
+      id: string;
+      type: string;
+      edge: string | null;
+    }[];
+
+    const formattedNodes = nodes.map((node) => ({
+      id: node.id,
+      color: node.type === "finding" ? "red" : "blue",
+      type: node.type,
+    }));
+
+    // Split edge by ,
+    const edges = [];
+
+    for (const node of nodes) {
+      if (node.edge) {
+        const edge = node.edge.split(",");
+        const formattedEdge = {
+          source: edge[0],
+          target: edge[1],
+        };
+        edges.push(formattedEdge);
+      }
+    }
+
+    console.log();
+
+    const newGraphData = {
+      nodes: formattedNodes,
+      links: edges,
+    };
+
+    setGraphData(newGraphData);
+  }, [entity?.n_deep_data]);
 
   const testMistralEndpoint = async () => {
     setLoading(true);
@@ -122,26 +148,28 @@ export const Topic = () => {
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
-          <ForceGraph3D
-            width={512}
-            height={512}
-            backgroundColor={"#f9f9f9"}
-            linkColor={() => "rgba(0,0,0,0.2)"}
-            graphData={graphData}
-            nodeThreeObject={(node: {
-              id: string;
-              name: string;
-              color: string;
-              type: string;
-            }) => {
-              const sprite = new SpriteText(node.name);
-              sprite.color = node.color;
-              sprite.textHeight = 8;
-              return sprite;
-            }}
-          />
-        </div>
+        {graphData && (
+          <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+            <ForceGraph3D
+              width={512}
+              height={512}
+              backgroundColor={"#f9f9f9"}
+              linkColor={() => "rgba(0,0,0,0.2)"}
+              graphData={graphData}
+              // nodeThreeObject={(node: {
+              //   id: string;
+              //   name: string;
+              //   color: string;
+              //   type: string;
+              // }) => {
+              //   const sprite = new SpriteText(node.name);
+              //   sprite.color = node.color;
+              //   sprite.textHeight = 8;
+              //   return sprite;
+              // }}
+            />
+          </div>
+        )}
 
         {entity && (
           <div className="flex flex-col space-y-2">
