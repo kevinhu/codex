@@ -1,11 +1,20 @@
 # %%
+from multiprocessing.pool import ThreadPool
 import os
 import re
+import traceback
 from typing import Self
+import click
 from crawler.types import ProcessedPaper
+from loguru import logger
 from pydantic import BaseModel
 import httpx
 import dotenv
+import polars as pl
+from crawler.serializers import NdjsonReader
+from pathlib import Path
+import random
+from tqdm import tqdm
 
 dotenv.load_dotenv()
 
@@ -195,7 +204,6 @@ class PaperAnalysisResponse(BaseModel):
         return self.model_dump_json(exclude_none=True, by_alias=False)
 
 
-# %%
 def get_completion(prompt):
     res = httpx.post(
         "https://api.mistral.ai/v1/chat/completions",
@@ -226,14 +234,71 @@ def get_completion(prompt):
     return json["choices"][0]["message"]["content"]
 
 
-with open("data/raw/test.json", "r") as f:
-    paper = ProcessedPaper.model_validate_json(f.read())
+@click.group()
+def cli():
+    pass
 
-    prompt = PaperAnalysisPrompt(paper=paper)
 
+@cli.command()
+def prepare():
+    sample_rate = 0.02
+
+    prompts: list[PaperAnalysisPrompt] = []
+
+    with NdjsonReader(
+        Path("data/processed/cs_inlined_papers.jsonl"), ProcessedPaper, validate=True
+    ) as f:
+        for p in tqdm(f):
+            if random.random() < sample_rate:
+                prompt = PaperAnalysisPrompt(paper=p)
+                prompts.append(prompt)
+
+    with open("data/raw/finetune_prompts.jsonl", "w") as f:
+        for prompt in prompts:
+            f.write(prompt.model_dump_json())
+            f.write("\n")
+
+
+class PaperAnalysisRun(BaseModel):
+    prompt: PaperAnalysisPrompt
+    response: PaperAnalysisResponse
+
+
+def run_prompt(prompt: PaperAnalysisPrompt):
     prompt_str = prompt.compile_prompt()
+    try:
+        completion = get_completion(prompt_str)
+        response = PaperAnalysisResponse.from_response(completion)
+    except Exception:
+        print(traceback.format_exc())
+        return None
 
-    completion = get_completion(prompt_str)
+    return PaperAnalysisRun(prompt=prompt, response=response)
 
-# %%
-response = PaperAnalysisResponse.from_response(completion)
+
+@cli.command()
+def execute():
+    prompts: list[PaperAnalysisPrompt] = []
+    with NdjsonReader(
+        Path("data/raw/finetune_prompts.jsonl"), PaperAnalysisPrompt, validate=True
+    ) as f:
+        for prompt in f:
+            prompts.append(prompt)
+
+    num_failed = 0
+
+    with open("data/raw/finetune_responses.jsonl", "w") as f:
+        with ThreadPool(32) as pool:
+            for response in tqdm(pool.imap_unordered(run_prompt, prompts)):
+                if response is None:
+                    num_failed += 1
+                    logger.warning("Error processing prompt")
+                    continue
+                f.write(response.model_dump_json())
+                f.write("\n")
+
+    logger.info(f"Failed to process {num_failed} prompts")
+
+
+if __name__ == "__main__":
+    cli()
