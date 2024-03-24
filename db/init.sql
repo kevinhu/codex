@@ -1,3 +1,12 @@
+CREATE TABLE IF NOT EXISTS resolved_topic (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    slug TEXT,
+    description TEXT,
+    type TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS topic (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -5,7 +14,9 @@ CREATE TABLE IF NOT EXISTS topic (
     description TEXT,
     type TEXT,
     is_primary BOOLEAN,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_topic_id TEXT NOT NULL,
+    FOREIGN KEY (resolved_topic_id) REFERENCES resolved_topic(id)
 );
 
 CREATE TABLE IF NOT EXISTS paper (
