@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom styles for markdown */
+.markdown h1 {
+  @apply text-2xl font-bold text-gray-600 my-4;
+}
+.markdown h2 {
+  @apply text-xl font-medium text-gray-600 my-2;
+}
+.markdown p {
+  @apply text-base text-gray-700;
+}
+.markdown code {
+  @apply bg-gray-100 p-2 rounded;
+}
