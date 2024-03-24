@@ -6,6 +6,7 @@ export interface Entity {
   id: string;
   name: string;
   slug: string;
+  type: string;
   description: string;
   is_primary: boolean;
   created_at: string;
@@ -36,7 +37,7 @@ function App() {
   }, [query]);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center px-2">
       <div className="flex flex-col w-full max-w-screen-md space-y-2 py-12">
         <h1>Codex</h1>
         <input
@@ -47,10 +48,14 @@ function App() {
           onChange={(e) => setQuery(e.target.value)}
           className="border border-gray-300 rounded px-2 py-1"
         />
-        <div className="border border-gray-300 rounded px-2 py-1 bg-gray-50 flex flex-col">
+        <div className="border border-gray-300 rounded px-3 py-2 bg-gray-50 flex flex-col space-y-2">
           {searchResults.map((result) => (
-            <Link key={result.id} to={`/${result.id}`}>
-              {result.name}
+            <Link key={result.id} to={`/${encodeURIComponent(result.id)}`}>
+              <div className="flex flex-col space-y-1">
+                <h2 className="text-lg">{result.name}</h2>
+                <p>{result.description}</p>
+                <hr />
+              </div>
             </Link>
           ))}
           {searchResults.length === 0 && "No results"}

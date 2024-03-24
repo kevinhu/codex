@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg
 from psycopg.rows import dict_row
+from vespa.application import Vespa
 
 app = FastAPI()
 
@@ -19,14 +20,14 @@ async def root():
     return {"message": "Hello World"}
 
 
-@app.get("/topic/{topic_id}")
-async def read_topic(topic_id: int):
+@app.get("/topic")
+async def read_topic(topic_id: str):
     try:
         with psycopg.connect(INTERNAL_DB_CONNECTION_STR, row_factory=dict_row) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    SELECT * FROM topic WHERE id = {topic_id};
+                    SELECT * FROM topic WHERE id = '{topic_id}';
                     """.format(
                         topic_id
                     ),
@@ -46,18 +47,18 @@ INTERNAL_DB_CONNECTION_STR = "dbname='mydb' user='myuser' host='localhost' passw
 
 @app.get("/search")
 async def search_topic(query: str):
+
+    vespa_url = "http://localhost:8080"
+
+    # Create a Vespa client
+    app = Vespa(url=vespa_url)
+
     try:
-        with psycopg.connect(INTERNAL_DB_CONNECTION_STR, row_factory=dict_row) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT * FROM topic;
-                    """
-                )
+        res = app.query(
+            body={"yql": f"select * from codex where default contains '{query}';"}
+        )
 
-                response = cur.fetchall()
-
-                return response
+        return [hit["fields"] for hit in res.hits]
 
     except Exception as e:
         print(e)
