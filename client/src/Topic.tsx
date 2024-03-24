@@ -4,12 +4,12 @@ import MistralClient from "@mistralai/mistralai";
 import { useLocalStorage } from "usehooks-ts";
 import { Link, useLoaderData } from "react-router-dom";
 import { ArrowUUpLeft } from "@phosphor-icons/react";
-import { Entity as EntityType } from "./App";
+import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
-export const Entity = () => {
-  const { entity } = useLoaderData() as { entity: EntityType | null };
+export const Topic = () => {
+  const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
@@ -51,10 +51,17 @@ export const Entity = () => {
         </Link>
         <div className="h-16">
           {entity ? (
-            <h1 className="text-3xl">{entity.name}</h1>
+            <>
+              <h2>{entity.type}</h2>
+              <h1 className="text-3xl">{entity.name}</h1>
+            </>
           ) : (
             <Skeleton height={30} width={240} />
           )}
+        </div>
+
+        <div>
+          {entity ? <p>{entity.description}</p> : <Skeleton count={3} />}
         </div>
 
         <div className="flex flex-col space-y-2 p-4 rounded-md bg-gray-50 border-gray-200 border">
@@ -87,6 +94,21 @@ export const Entity = () => {
             {response || "What is the best French cheese?"}
           </div>
         </div>
+
+        {entity && (
+          <div className="flex flex-col space-y-2">
+            <h2 className="text-lg">Findings</h2>
+            <div className="flex flex-col space-y-2">
+              {entity.findings.map((finding) => (
+                <div key={finding.id} className="flex flex-col space-y-1">
+                  <h3>{finding.name}</h3>
+                  <p>{finding.description}</p>
+                  <hr />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

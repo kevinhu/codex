@@ -3,7 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { Entity } from "./Entity.tsx";
+import { Topic } from "./Topic.tsx";
 import { loader as entityLoader } from "./router.ts";
 
 const router = createBrowserRouter([
@@ -13,7 +13,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/:id",
-    element: <Entity />,
+    element: <Topic />,
     loader: entityLoader,
   },
 ]);
