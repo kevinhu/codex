@@ -1,11 +1,14 @@
 # %%
 import re
 from typing import Annotated, Literal, Optional, Self, TypeVar
-from pydantic import BaseModel, BeforeValidator, Discriminator, Field
+from uuid import uuid4
+from pydantic import BaseModel, BeforeValidator, Discriminator, Field, StringConstraints, model_validator
 
 
 T = TypeVar("T")
 
+
+MAX_PAPER_LENGTH = 16_000
 
 def falsy_to_none(x: T) -> T | None:
     """
@@ -297,25 +300,26 @@ type Dataset = BaseTopic & {
 ## Abstract
 {self.paper.abstract.text.strip()}
 
-{paper_text}
+{paper_text[:MAX_PAPER_LENGTH]}
 ```
 
 When extracting information, assume a relatively basic level of background knowledge. Your response should be concise and informative, focusing on the key aspects of the paper. Keep your JSON concise by omitting missing properties instead of explicitly setting them to `null`, `undefined`, or an empty string/array. Do not indent your JSON response.
 """
         return user_text
 
+SlugStr = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]+$")]
 
 class Finding(BaseModel):
-    slug: str
+    slug: SlugStr
     name: str
     description: str
 
 
 class Topic(BaseModel):
-    slug: str
+    slug: SlugStr
     name: str
     description: str
-    linked_findings: list[str]
+    linked_findings: set[SlugStr]
 
 
 class Task(Topic):
@@ -367,7 +371,112 @@ class PaperAnalysisResponse(BaseModel):
 
     def to_response(self) -> str:
         return self.model_dump_json(exclude_none=True, by_alias=False)
+    
+    @model_validator(mode="after")
+    def validate_response(self):
+        finding_slugs = {finding.slug for finding in self.findings}
+        
+        assert len(finding_slugs) == len(self.findings), "Finding slugs must be unique."
+        
+        for task in self.tasks:
+            assert task.linked_findings.issubset(finding_slugs), "Task linked findings must be a subset of the findings."
+        for benchmark in self.benchmarks:
+            assert benchmark.linked_findings.issubset(finding_slugs), "Benchmark linked findings must be a subset of the findings."
+        for architecture in self.architectures:
+            assert architecture.linked_findings.issubset(finding_slugs), "Architecture linked findings must be a subset of the findings."
+        for model in self.models:
+            assert model.linked_findings.issubset(finding_slugs), "Model linked findings must be a subset of the findings."
+        for method in self.methods:
+            assert method.linked_findings.issubset(finding_slugs), "Method linked findings must be a subset of the findings."
+        for dataset in self.datasets:
+            assert dataset.linked_findings.issubset(finding_slugs), "Dataset linked findings must be a subset of the findings."
+            
+        return self
 
+class ProcessedFinding(BaseModel):
+    slug: str
+    name: str
+    description: str
+    finding_id: str
+
+class ProcessedTopic(BaseModel):
+    slug: str
+    name: str
+    description: str
+    type: Literal["task", "benchmark", "architecture", "model", "method", "dataset"]
+    linked_finding_ids: list[str]
+    topic_id: str
+
+def process_response(response: PaperAnalysisResponse):
+    processed_findings:list[ProcessedFinding] = []
+    for finding in response.findings:
+        processed_findings.append(ProcessedFinding(
+            slug=finding.slug,
+            name=finding.name,
+            description=finding.description,
+            finding_id=f"finding:{uuid4()}"
+        ))
+        
+    finding_slug_to_id = {finding.slug: finding.finding_id for finding in processed_findings}
+        
+    processed_topics:list[ProcessedTopic] = []
+    
+    for task in response.tasks:
+        processed_topics.append(ProcessedTopic(
+            slug=task.slug,
+            name=task.name,
+            description=task.description,
+            linked_finding_ids=[finding_slug_to_id[slug] for slug in task.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="task"
+        ))
+    for benchmark in response.benchmarks:
+        processed_topics.append(ProcessedTopic(
+            slug=benchmark.slug,
+            name=benchmark.name,
+            description=benchmark.description,
+            linked_finding_ids=[finding.slug for finding in response.findings if finding.slug in benchmark.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="benchmark"
+        ))
+    for architecture in response.architectures:
+        processed_topics.append(ProcessedTopic(
+            slug=architecture.slug,
+            name=architecture.name,
+            description=architecture.description,
+            linked_finding_ids=[finding.slug for finding in response.findings if finding.slug in architecture.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="architecture"
+        ))
+    for model in response.models:
+        processed_topics.append(ProcessedTopic(
+            slug=model.slug,
+            name=model.name,
+            description=model.description,
+            linked_finding_ids=[finding.slug for finding in response.findings if finding.slug in model.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="model"
+        ))
+    for method in response.methods:
+        processed_topics.append(ProcessedTopic(
+            slug=method.slug,
+            name=method.name,
+            description=method.description,
+            linked_finding_ids=[finding.slug for finding in response.findings if finding.slug in method.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="method"
+        ))
+    for dataset in response.datasets:
+        processed_topics.append(ProcessedTopic(
+            slug=dataset.slug,
+            name=dataset.name,
+            description=dataset.description,
+            linked_finding_ids=[finding.slug for finding in response.findings if finding.slug in dataset.linked_findings],
+            topic_id=f"topic:{uuid4()}",
+            type="dataset"
+        ))
+    
+    return processed_findings, processed_topics
 
 class PaperAnalysisRun(BaseModel):
     prompt: PaperAnalysisPrompt

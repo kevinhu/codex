@@ -8,6 +8,7 @@ from crawler.types import (
     PaperAnalysisResponse,
     PaperAnalysisRun,
     ProcessedPaper,
+    process_response,
 )
 from loguru import logger
 import httpx
@@ -46,6 +47,10 @@ def get_completion(prompt):
         },
         timeout=120,
     )
+    
+    if res.status_code != 200:
+        logger.error(f"Failed to get completion: {res.text}")
+        return None
 
     json = res.json()
 
@@ -82,6 +87,7 @@ def run_prompt(prompt: PaperAnalysisPrompt):
     try:
         completion = get_completion(prompt_str)
         response = PaperAnalysisResponse.from_response(completion)
+        process_response(response)
     except Exception:
         print(traceback.format_exc())
         return None
