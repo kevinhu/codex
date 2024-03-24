@@ -4,6 +4,7 @@ import axios from "axios";
 import { ForceGraph2D, ForceGraph3D } from "react-force-graph";
 import SpriteText from "three-spritetext";
 import { API_BASE_URL } from "./config";
+import logo from "./logo.jpeg";
 
 export interface Topic {
   id: string;
@@ -133,9 +134,14 @@ function App() {
   return (
     <div className="flex flex-col items-center px-2">
       <div className="flex flex-col w-full max-w-screen-md space-y-6 py-12">
-        <h1 className="text-4xl mt-16">
-          Codex is an LLM-powered search engine for ML research
-        </h1>
+        <div className="flex items-center mt-16 gap-4">
+          <img
+            src={logo}
+            alt="Codex"
+            className="w-24 h-24 border-2 shadow-lg rounded-xl"
+          />
+          <h1 className="text-6xl font-semibold">Codex</h1>
+        </div>
         <div className="text-xl">
           <h2>
             <span className="font-bold text-blue-500">53,339</span> papers
