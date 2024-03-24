@@ -49,3 +49,6 @@ CREATE TABLE IF NOT EXISTS topic_finding (
     FOREIGN KEY (finding_id) REFERENCES finding (id),
     FOREIGN KEY (resolved_topic_id) REFERENCES resolved_topic (id)
 );
+CREATE INDEX topic_finding_topic_id_idx ON topic_finding(topic_id text_ops);
+CREATE INDEX topic_finding_finding_id_idx ON topic_finding(finding_id text_ops);
+CREATE INDEX topic_finding_resolved_topic_id_idx ON topic_finding(resolved_topic_id text_ops);
