@@ -1,6 +1,7 @@
 # %%
 from collections import defaultdict
 from pathlib import Path
+from uuid import uuid4
 
 import click
 from tqdm import tqdm
@@ -241,7 +242,7 @@ def resolve():
             topics = [topics_by_id[topic_id] for topic_id in value]
 
             resolved_topic = ResolvedTopicModel(
-                topic_id=topics[0].topic_id,
+                topic_id=f"resolved_topic:{uuid4()}",
                 name=topics[0].name,
                 type=topics[0].type,
                 slug=topics[0].slug,
