@@ -18,9 +18,15 @@ export const Entity = () => {
 
   useEffect(() => {
     try {
-      axios.get(`http://localhost:8000/topic/${entity.id}`).then((response) => {
-        setTopic(response.data);
-      });
+      axios
+        .get(`http://localhost:8000/topic`, {
+          params: {
+            topic_id: entity.id,
+          },
+        })
+        .then((response) => {
+          setTopic(response.data);
+        });
     } catch (error) {
       console.error(error);
     }

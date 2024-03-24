@@ -5,6 +5,6 @@ export async function getEntity(id: string) {
 }
 
 export async function loader({ params }: LoaderFunctionArgs<{ id: string }>) {
-  const entity = await getEntity(params.id || "");
+  const entity = await getEntity(decodeURIComponent(params.id || ""));
   return { entity };
 }

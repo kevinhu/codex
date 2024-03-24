@@ -49,7 +49,7 @@ function App() {
         />
         <div className="border border-gray-300 rounded px-3 py-2 bg-gray-50 flex flex-col space-y-2">
           {searchResults.map((result) => (
-            <Link key={result.id} to={`/${result.id}`}>
+            <Link key={result.id} to={`/${encodeURIComponent(result.id)}`}>
               <div className="flex flex-col space-y-1">
                 <h2 className="text-lg">{result.name}</h2>
                 <p>{result.description}</p>
