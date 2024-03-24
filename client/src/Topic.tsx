@@ -150,7 +150,15 @@ export const Topic = () => {
               {entity.findings?.length > 0 ? (
                 entity.findings.map((finding) => (
                   <div key={finding.id} className="flex flex-col space-y-1">
-                    <h3>{finding.name}</h3>
+                    <a
+                      href={`https://arxiv.org/abs/${finding.paper_id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline text-blue-500 text-sm"
+                    >
+                      {finding.paper_id}: {finding.title}
+                    </a>
+                    <h3 className="font-bold">{finding.name}</h3>
                     <p>{finding.description}</p>
                     <hr />
                   </div>

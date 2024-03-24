@@ -23,6 +23,11 @@ export interface Finding {
   name: string;
   slug: string;
   description: string;
+  authors: string;
+  paper_id: string;
+  title: string;
+  abstract: string;
+  update_date: string;
   created_at: string;
 }
 

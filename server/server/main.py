@@ -45,9 +45,10 @@ async def read_topic(topic_id: str):
 
                 cur.execute(
                     f"""
-                    SELECT f.*
+                    SELECT f.*, p.id as paper_id, p.title, p.authors, p.update_date, p.abstract
                     FROM finding f
                     JOIN topic_finding tf ON f.id = tf.finding_id
+                    JOIN paper p ON f.paper_id = p.id
                     WHERE tf.topic_id = '{topic_id}';
                     """
                 )
