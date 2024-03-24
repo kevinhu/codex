@@ -82,6 +82,7 @@ for topic in processed_topics:
         fields={
             "id": topic_dict["topic_id"],
             "name": topic_dict["name"],
+            "type": topic_dict["type"],
             "slug": topic_dict["slug"],
             "description": topic_dict["description"],
         },

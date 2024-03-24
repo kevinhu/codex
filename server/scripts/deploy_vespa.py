@@ -18,6 +18,12 @@ app_package.schema.add_fields(
         index="enable-bm25",
     ),
     Field(
+        name="type",
+        type="string",
+        indexing=["attribute", "summary"],
+        attribute=["fast-search"],
+    ),
+    Field(
         name="slug",
         type="string",
         indexing=["index", "summary"],
