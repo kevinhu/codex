@@ -1,3 +1,6 @@
 dev:
     @echo "Starting development server..."
     poetry run uvicorn server.main:app --reload --port 8000 --use-colors
+prod:
+    @echo "Starting prod"
+    poetry run uvicorn server.main:app --port 80

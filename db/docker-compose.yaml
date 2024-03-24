@@ -14,5 +14,18 @@ services:
       - my_dbdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  server:
+    network_mode: host
+    container_name: server
+    command: poetry run uvicorn server.main:app --port 443 --host 0.0.0.0 --ssl-keyfile /code/server/key.pem --ssl-certfile /code/server/cert.pem
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      network: host
+    image: server
+    restart: always
+    init: true
+
+
 volumes:
   my_dbdata:

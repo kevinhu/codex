@@ -3,8 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 import psycopg
 from psycopg.rows import dict_row
 from vespa.application import Vespa
+import ssl
+import os
 
 app = FastAPI()
+
+# if os.environ["FASTAPI_ENV"] == "production":
+#     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+#     ssl_context.load_cert_chain('/code/server/cert.pem', keyfile='/code/server/key.pem')
 
 app.add_middleware(
     CORSMiddleware,
