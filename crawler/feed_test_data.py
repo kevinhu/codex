@@ -13,7 +13,9 @@ PROCESSED_DATA_DIR = DATA_DIR / "processed"
 # %%
 with open(PROCESSED_DATA_DIR / "finetune_responses.jsonl", "r") as f:
     # read first N lines
-    lines = [PaperAnalysisRun.model_validate_json(next(f)) for _ in range(5)]
+    # lines = [PaperAnalysisRun.model_validate_json(next(f)) for _ in range(5)]
+    # read all lines
+    lines = [PaperAnalysisRun.model_validate_json(line) for line in f.readlines()]
 
 # %%
 INTERNAL_DB_CONNECTION_STR = "dbname='mydb' user='myuser' host='localhost' password='mysecretpassword' port='5432'"

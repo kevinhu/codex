@@ -1,36 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "sonner";
 import MistralClient from "@mistralai/mistralai";
 import { useLocalStorage } from "usehooks-ts";
 import { Link, useLoaderData } from "react-router-dom";
 import { ArrowUUpLeft } from "@phosphor-icons/react";
-import axios from "axios";
 import { Entity as EntityType } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
 export const Entity = () => {
-  const { entity } = useLoaderData() as { entity: { id: string } };
+  const { entity } = useLoaderData() as { entity: EntityType | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [topic, setTopic] = useState<EntityType | null>(null);
-
-  useEffect(() => {
-    try {
-      axios
-        .get(`http://localhost:8000/topic`, {
-          params: {
-            topic_id: entity.id,
-          },
-        })
-        .then((response) => {
-          setTopic(response.data);
-        });
-    } catch (error) {
-      console.error(error);
-    }
-  }, [entity.id]);
 
   const testMistralEndpoint = async () => {
     setLoading(true);
@@ -61,15 +43,15 @@ export const Entity = () => {
   };
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center px-2">
       <Toaster />
       <div className="flex flex-col w-full max-w-screen-md space-y-6 py-12">
         <Link to="/">
           <ArrowUUpLeft size={24} />
         </Link>
         <div className="h-16">
-          {topic ? (
-            <h1 className="text-3xl">{topic.name}</h1>
+          {entity ? (
+            <h1 className="text-3xl">{entity.name}</h1>
           ) : (
             <Skeleton height={30} width={240} />
           )}

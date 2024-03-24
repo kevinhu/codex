@@ -6,6 +6,7 @@ export interface Entity {
   id: string;
   name: string;
   slug: string;
+  type: string;
   description: string;
   is_primary: boolean;
   created_at: string;
@@ -36,7 +37,7 @@ function App() {
   }, [query]);
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center px-2">
       <div className="flex flex-col w-full max-w-screen-md space-y-2 py-12">
         <h1>Codex</h1>
         <input
