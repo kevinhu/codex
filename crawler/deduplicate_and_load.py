@@ -61,6 +61,12 @@ class TopicFindingModel(BaseModel):
     finding_id: str
 
 
+class ProcessedTopicFindingModel(BaseModel):
+    topic_id: str
+    finding_id: str
+    resolved_topic_id: str
+
+
 @click.group()
 def cli():
     pass
@@ -233,6 +239,8 @@ def resolve():
         topic_ids_by_slug, topic_ids_by_name, max_merge_count=256
     )
 
+    raw_to_resolved_topic_id: dict[str, str] = dict()
+
     with open(
         "data/processed/processed_topic_models.jsonl", "w"
     ) as processed_topic_w, open(
@@ -261,8 +269,25 @@ def resolve():
                     description=topic.description,
                     resolved_topic_id=resolved_topic.topic_id,
                 )
+                raw_to_resolved_topic_id[topic.topic_id] = resolved_topic.topic_id
                 processed_topic_w.write(processed_topic.model_dump_json())
                 processed_topic_w.write("\n")
+
+    with NdjsonReader(
+        Path("data/processed/topic_finding_models.jsonl"), TopicFindingModel
+    ) as topic_finding_r, open(
+        "data/processed/processed_topic_finding_models.jsonl", "w"
+    ) as processed_topic_finding_w:
+        for topic_finding in tqdm(topic_finding_r):
+            resolved_topic_id = raw_to_resolved_topic_id[topic_finding.topic_id]
+
+            processed_topic_finding = ProcessedTopicFindingModel(
+                topic_id=topic_finding.topic_id,
+                finding_id=topic_finding.finding_id,
+                resolved_topic_id=resolved_topic_id,
+            )
+            processed_topic_finding_w.write(processed_topic_finding.model_dump_json())
+            processed_topic_finding_w.write("\n")
 
 
 @cli.command()
@@ -346,16 +371,18 @@ def load_postgres():
                         )
 
             with cur.copy(
-                "COPY topic_finding (topic_id, finding_id) FROM STDIN"
+                "COPY topic_finding (topic_id, finding_id, resolved_topic_id) FROM STDIN"
             ) as topic_finding_copy:
                 with NdjsonReader(
-                    Path("data/processed/topic_finding_models.jsonl"), TopicFindingModel
+                    Path("data/processed/processed_topic_finding_models.jsonl"),
+                    ProcessedTopicFindingModel,
                 ) as f:
                     for line in tqdm(f):
                         topic_finding_copy.write_row(
                             (
                                 line.topic_id,
                                 line.finding_id,
+                                line.resolved_topic_id,
                             )
                         )
 

@@ -43,7 +43,9 @@ ADD FOREIGN KEY (paper_id) REFERENCES paper(id);
 CREATE TABLE IF NOT EXISTS topic_finding (
     topic_id TEXT NOT NULL,
     finding_id TEXT NOT NULL,
+    resolved_topic_id TEXT NOT NULL,
     PRIMARY KEY (topic_id, finding_id),
     FOREIGN KEY (topic_id) REFERENCES topic (id),
-    FOREIGN KEY (finding_id) REFERENCES finding (id)
+    FOREIGN KEY (finding_id) REFERENCES finding (id),
+    FOREIGN KEY (resolved_topic_id) REFERENCES resolved_topic (id)
 );
