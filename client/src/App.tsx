@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 
-export interface Entity {
+export interface Topic {
   id: string;
   name: string;
   slug: string;
@@ -12,9 +12,21 @@ export interface Entity {
   created_at: string;
 }
 
+export interface TopicWithFindings extends Topic {
+  findings: Finding[];
+}
+
+export interface Finding {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  created_at: string;
+}
+
 function App() {
   const [query, setQuery] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<Entity[]>([]);
+  const [searchResults, setSearchResults] = useState<Topic[]>([]);
 
   useEffect(() => {
     if (query.length === 0) {

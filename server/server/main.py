@@ -34,14 +34,25 @@ async def read_topic(topic_id: str):
                 cur.execute(
                     f"""
                     SELECT * FROM topic WHERE id = '{topic_id}';
-                    """.format(
-                        topic_id
-                    ),
+                    """
                 )
 
                 response = cur.fetchall()
 
-                return response[0]
+                topic = response[0]
+
+                cur.execute(
+                    f"""
+                    SELECT f.*
+                    FROM finding f
+                    JOIN topic_finding tf ON f.id = tf.finding_id
+                    WHERE tf.topic_id = '{topic_id}';
+                    """
+                )
+
+                findings = cur.fetchall()
+
+                return {**topic, "findings": findings}
 
     except Exception as e:
         print(e)
