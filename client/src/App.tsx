@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ForceGraph3D } from "react-force-graph";
+import { ForceGraph2D, ForceGraph3D } from "react-force-graph";
 import SpriteText from "three-spritetext";
 import { API_BASE_URL } from "./config";
 
@@ -46,14 +46,23 @@ const TOGGLES = {
 };
 
 const N = 300;
-const myData = {
-  nodes: [...Array(N).keys()].map((i) => ({ id: `${i}`, group: i / 12 })),
-  links: [...Array(N).keys()]
-    .filter((id) => id)
-    .map((id) => ({
-      source: `${id}`,
-      target: `${Math.round(Math.random() * (id - 1))}`,
-    })),
+
+type RawGraph = {
+  findings: {
+    finding_id: string;
+    name: string;
+    paper_id: string;
+  }[];
+  topics: {
+    id: string;
+    name: string;
+    degree: number;
+  }[];
+  links: {
+    topic_id: string;
+    finding_id: string;
+    resolved_topic_id: string;
+  }[];
 };
 
 function App() {
@@ -61,6 +70,35 @@ function App() {
   const [searchResults, setSearchResults] = useState<Topic[]>([]);
   const [toggles, setToggles] = useState<{ [key: string]: boolean }>(TOGGLES);
   const navigate = useNavigate();
+
+  const [graph, setGraph] = useState<RawGraph>();
+
+  const mappedGraph = useMemo(() => {
+    if (!graph) return undefined;
+    const topics = graph.topics.map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      type: "topic",
+    }));
+    const findings = graph.findings.map((finding) => ({
+      id: finding.finding_id,
+      name: finding.name,
+      type: "finding",
+    }));
+    return {
+      nodes: [...topics, ...findings],
+      links: graph.links.map((link) => ({
+        source: link.resolved_topic_id,
+        target: link.finding_id,
+      })),
+    };
+  }, [graph]);
+
+  useEffect(() => {
+    axios.get(`${API_BASE_URL}/graph`).then((response) => {
+      setGraph(response.data);
+    });
+  }, []);
 
   useEffect(() => {
     if (query.length === 0) {
@@ -96,7 +134,7 @@ function App() {
     <div className="flex flex-col items-center px-2">
       <div className="flex flex-col w-full max-w-screen-md space-y-6 py-12">
         <h1 className="text-4xl mt-16">
-          Codex is a search engine and relationship mapping tool for ML research
+          Codex is an LLM-powered search engine for ML research
         </h1>
         <div className="text-xl">
           <h2>
@@ -157,19 +195,18 @@ function App() {
         <div className="border border-gray-200 rounded-lg shadow w-full overflow-hidden self-center">
           <ForceGraph3D
             backgroundColor={"#f9f9f9"}
-            linkColor={() => "rgba(0,0,0,0.2)"}
-            graphData={myData}
-            nodeAutoColorBy="group"
-            nodeThreeObject={(node: {
-              id: string | undefined;
-              color: string;
-            }) => {
-              const sprite = new SpriteText(node.id);
-              sprite.color = node.color;
-              sprite.textHeight = 8;
-              return sprite;
-            }}
+            linkColor={() => "rgba(0,0,0,0.5)"}
+            linkWidth={1}
+            graphData={mappedGraph}
+            nodeAutoColorBy="type"
+            nodeRelSize={8}
             onNodeClick={handleClick}
+            nodeLabel={(node) => {
+              return `<span class="bg-black rounded-md p-1">${node.name}</span>`;
+            }}
+            nodeVal={(node) => {
+              return node.degree ** 2;
+            }}
           />
         </div>
       </div>
