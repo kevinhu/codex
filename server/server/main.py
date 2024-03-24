@@ -33,6 +33,8 @@ async def read_topic(topic_id: str):
 
                 response = cur.fetchall()
 
+                print("topic_id", topic_id, response)
+
                 topic = response[0]
 
                 cur.execute(
@@ -57,7 +59,9 @@ INTERNAL_DB_CONNECTION_STR = "dbname='mydb' user='myuser' host='localhost' passw
 
 
 @app.get("/search")
-async def search_topic(query: str):
+async def search_topic(query: str, type_list_str: str):
+
+    type_list = type_list_str.split(",") if type_list_str else []
 
     vespa_url = "http://localhost:8080"
 
@@ -65,8 +69,16 @@ async def search_topic(query: str):
     app = Vespa(url=vespa_url)
 
     try:
+        type_condition = ""
+        if type_list:  # Check if type_list is not empty
+            type_str = ", ".join(f"'{t}'" for t in type_list)
+            type_condition = (
+                f" and type in ({type_str})"  # Correctly format the IN clause
+            )
         res = app.query(
-            body={"yql": f"select * from codex where default contains '{query}';"}
+            body={
+                "yql": f"select * from codex where default contains '{query}'{type_condition};"
+            }
         )
 
         return [hit["fields"] for hit in res.hits]

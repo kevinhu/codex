@@ -8,6 +8,15 @@ CREATE TABLE IF NOT EXISTS topic (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS paper (
+    id TEXT PRIMARY KEY,
+    authors TEXT,
+    title TEXT,
+    update_date TIMESTAMP,
+    abstract TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS finding (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -15,6 +24,10 @@ CREATE TABLE IF NOT EXISTS finding (
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE finding
+ADD COLUMN paper_id TEXT,
+ADD FOREIGN KEY (paper_id) REFERENCES paper(id);
 
 CREATE TABLE IF NOT EXISTS topic_finding (
     topic_id TEXT NOT NULL,

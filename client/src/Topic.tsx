@@ -7,6 +7,19 @@ import { ArrowUUpLeft } from "@phosphor-icons/react";
 import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { ForceGraph3D } from "react-force-graph";
+import SpriteText from "three-spritetext";
+
+const N = 300;
+const myData = {
+  nodes: [...Array(N).keys()].map((i) => ({ id: i, group: i / 12 })),
+  links: [...Array(N).keys()]
+    .filter((id) => id)
+    .map((id) => ({
+      source: id,
+      target: Math.round(Math.random() * (id - 1)),
+    })),
+};
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
@@ -95,17 +108,41 @@ export const Topic = () => {
           </div>
         </div>
 
+        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+          <ForceGraph3D
+            width={512}
+            height={512}
+            backgroundColor={"#f9f9f9"}
+            linkColor={() => "rgba(0,0,0,0.2)"}
+            graphData={myData}
+            nodeAutoColorBy="group"
+            nodeThreeObject={(node: {
+              id: string | undefined;
+              color: string;
+            }) => {
+              const sprite = new SpriteText(node.id);
+              sprite.color = node.color;
+              sprite.textHeight = 8;
+              return sprite;
+            }}
+          />
+        </div>
+
         {entity && (
           <div className="flex flex-col space-y-2">
             <h2 className="text-lg">Findings</h2>
             <div className="flex flex-col space-y-2">
-              {entity.findings.map((finding) => (
-                <div key={finding.id} className="flex flex-col space-y-1">
-                  <h3>{finding.name}</h3>
-                  <p>{finding.description}</p>
-                  <hr />
-                </div>
-              ))}
+              {entity.findings?.length > 0 ? (
+                entity.findings.map((finding) => (
+                  <div key={finding.id} className="flex flex-col space-y-1">
+                    <h3>{finding.name}</h3>
+                    <p>{finding.description}</p>
+                    <hr />
+                  </div>
+                ))
+              ) : (
+                <>No findings</>
+              )}
             </div>
           </div>
         )}
