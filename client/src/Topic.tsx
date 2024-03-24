@@ -9,11 +9,14 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { ForceGraph3D } from "react-force-graph";
 // import SpriteText from "three-spritetext";
+import Markdown from "marked-react";
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
-  const [response, setResponse] = useState<string>("");
+  const [response, setResponse] = useState("");
+  const [testResponse, setTestResponse] = useState<string>("");
+
   const [loading, setLoading] = useState<boolean>(false);
   const [graphData, setGraphData] = useState<{
     nodes: { id: string; color: string; type: string }[];
@@ -57,8 +60,6 @@ export const Topic = () => {
       }
     }
 
-    console.log();
-
     const newGraphData = {
       nodes: formattedNodes,
       links: edges,
@@ -79,6 +80,52 @@ export const Topic = () => {
         ],
       });
 
+      setTestResponse("");
+
+      for await (const chatResponse of streamResponse) {
+        setTestResponse(
+          (response) => response + chatResponse.choices[0].delta.content
+        );
+      }
+
+      console.log(testResponse);
+    } catch (error) {
+      console.error(error);
+    }
+
+    setLoading(false);
+  };
+
+  const generateArticle = async () => {
+    setLoading(true);
+    const client = new MistralClient(apiKey);
+
+    try {
+      const chronologicallyOrderedFindings =
+        entity?.findings?.sort(
+          (a, b) =>
+            new Date(a.update_date).getTime() -
+            new Date(b.update_date).getTime()
+        ) || [];
+
+      const findingsStr = chronologicallyOrderedFindings
+        .map((finding) => JSON.stringify(finding))
+        .slice(0, 30)
+        .join("\n");
+
+      const content = `Your task is to write a readable markdown article in the style of a Wikipedia page using findings from research papers. Include citations when necessary using markdown links to the paper IDs
+
+Here are the findings for the topic "${entity?.name}":
+"""
+${findingsStr}
+"""
+      // `;
+
+      const streamResponse = await client.chatStream({
+        model: "mistral-large-latest",
+        messages: [{ role: "user", content }],
+      });
+
       setResponse("");
 
       for await (const chatResponse of streamResponse) {
@@ -87,7 +134,7 @@ export const Topic = () => {
         );
       }
 
-      console.log(response);
+      // console.log(response);
     } catch (error) {
       console.error(error);
     }
@@ -132,7 +179,11 @@ export const Topic = () => {
             onChange={(e) => setApiKey(e.target.value)}
             className="border border-gray-300 rounded px-2 py-1"
           />
-          <button className="bg-blue-500 text-white rounded px-3 py-1">
+          <button
+            onClick={generateArticle}
+            disabled={loading}
+            className="bg-blue-500 text-white rounded px-3 py-1"
+          >
             Generate
           </button>
           <button
@@ -144,9 +195,11 @@ export const Topic = () => {
           </button>
 
           <div className="border border-gray-300 rounded px-2 py-1 bg-gray-50 whitespace-pre-wrap text-gray-600">
-            {response || "What is the best French cheese?"}
+            {testResponse || "What is the best French cheese?"}
           </div>
         </div>
+
+        <div>{response && <Markdown>{response}</Markdown>}</div>
 
         {graphData && (
           <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
