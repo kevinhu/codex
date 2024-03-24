@@ -1,15 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
 import MistralClient from "@mistralai/mistralai";
 import { useLocalStorage } from "usehooks-ts";
 import { Link, useLoaderData } from "react-router-dom";
 import { ArrowUUpLeft } from "@phosphor-icons/react";
+import axios from "axios";
+import { Entity as EntityType } from "./App";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 export const Entity = () => {
   const { entity } = useLoaderData() as { entity: { id: string } };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [topic, setTopic] = useState<EntityType | null>(null);
+
+  useEffect(() => {
+    try {
+      axios.get(`http://localhost:8000/topic/${entity.id}`).then((response) => {
+        setTopic(response.data);
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  }, [entity.id]);
 
   const testMistralEndpoint = async () => {
     setLoading(true);
@@ -46,7 +61,13 @@ export const Entity = () => {
         <Link to="/">
           <ArrowUUpLeft size={24} />
         </Link>
-        <h1 className="text-3xl">{entity.id}</h1>
+        <div className="h-16">
+          {topic ? (
+            <h1 className="text-3xl">{topic.name}</h1>
+          ) : (
+            <Skeleton height={30} width={240} />
+          )}
+        </div>
 
         <div className="flex flex-col space-y-2 p-4 rounded-md bg-gray-50 border-gray-200 border">
           <p className="text-xl text-gray-700">
