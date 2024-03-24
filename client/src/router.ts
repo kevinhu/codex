@@ -1,9 +1,10 @@
 import { LoaderFunctionArgs } from "react-router-dom";
 import axios from "axios";
+import { API_BASE_URL } from "./config";
 
 export async function getEntity(id: string) {
   try {
-    const res = await axios.get(`http://localhost:8000/topic`, {
+    const res = await axios.get(`${API_BASE_URL}/topic`, {
       params: {
         topic_id: id,
       },

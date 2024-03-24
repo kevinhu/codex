@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ForceGraph3D } from "react-force-graph";
 import SpriteText from "three-spritetext";
+import { API_BASE_URL } from "./config";
 
 export interface Topic {
   id: string;
@@ -63,7 +64,7 @@ function App() {
     }
     try {
       axios
-        .get(`http://localhost:8000/search`, {
+        .get(`${API_BASE_URL}/search`, {
           params: {
             query,
             type_list_str: Object.keys(toggles)
@@ -89,40 +90,24 @@ function App() {
   return (
     <div className="flex flex-col items-center px-2">
       <div className="flex flex-col w-full max-w-screen-md space-y-6 py-12">
-        <h1 className="text-3xl mt-16">
-          Codex is a search engine and relationship mapping tool for research
+        <h1 className="text-4xl mt-16">
+          Codex is a search engine and relationship mapping tool for ML research
         </h1>
         <div className="text-xl">
           <h2>
-            <span className="font-bold font-mono">53339</span> papers indexed
+            <span className="font-bold text-blue-500">53,339</span> papers
+            indexed
           </h2>
           <h2>
-            <span className="font-bold font-mono">X</span> topics covered
+            <span className="font-bold text-indigo-500">130,427</span> topics
+            resolved
           </h2>
           <h2>
-            <span className="font-bold font-mono">Y</span> findings
+            <span className="font-bold text-violet-500">165,131</span> findings
+            extracted
           </h2>
         </div>
-        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
-          <ForceGraph3D
-            width={512}
-            height={512}
-            backgroundColor={"#f9f9f9"}
-            linkColor={() => "rgba(0,0,0,0.2)"}
-            graphData={myData}
-            nodeAutoColorBy="group"
-            nodeThreeObject={(node: {
-              id: string | undefined;
-              color: string;
-            }) => {
-              const sprite = new SpriteText(node.id);
-              sprite.color = node.color;
-              sprite.textHeight = 8;
-              return sprite;
-            }}
-            onNodeClick={handleClick}
-          />
-        </div>
+        {/* Search */}
         <div className="flex flex-col space-y-2">
           <div className="flex space-x-2 justify-end">
             {Object.keys(toggles).map((key) => (
@@ -160,6 +145,27 @@ function App() {
             ))}
             {searchResults.length === 0 && "No results"}
           </div>
+        </div>
+      </div>
+      {/* Graph */}
+      <div className="px-8 md:px-16 mb-16 w-full h-screen">
+        <div className="border border-gray-200 rounded-lg shadow w-full overflow-hidden self-center">
+          <ForceGraph3D
+            backgroundColor={"#f9f9f9"}
+            linkColor={() => "rgba(0,0,0,0.2)"}
+            graphData={myData}
+            nodeAutoColorBy="group"
+            nodeThreeObject={(node: {
+              id: string | undefined;
+              color: string;
+            }) => {
+              const sprite = new SpriteText(node.id);
+              sprite.color = node.color;
+              sprite.textHeight = 8;
+              return sprite;
+            }}
+            onNodeClick={handleClick}
+          />
         </div>
       </div>
     </div>
