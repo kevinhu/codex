@@ -1,6 +1,15 @@
 # %%
+import os
+import re
+from typing import Self
 from crawler.types import ProcessedPaper
 from pydantic import BaseModel
+import httpx
+import dotenv
+
+dotenv.load_dotenv()
+
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 
 
 class PaperAnalysisPrompt(BaseModel):
@@ -38,7 +47,7 @@ type Finding = {
     // Short name for the finding that could be used to retrieve it in a search engine. Required.
     name: string;
     // A clear, accessible, and impartial summary of the finding. Use at most five sentences. The description should make sense when read alone. Required.
-    body: string;
+    description: string;
 };
 
 // A topic is a concept or idea that is discussed in the paper and linked to findings. Do not merge similar topics into one.
@@ -91,6 +100,10 @@ type Dataset = BaseTopic & {
 ```
 """
 
+        return system_text + self.user_text
+
+    @property
+    def user_text(self):
         paper_text = ""
 
         current_section = None
@@ -115,8 +128,102 @@ type Dataset = BaseTopic & {
 
 When extracting information, assume a relatively basic level of background knowledge. Your response should be concise and informative, focusing on the key aspects of the paper. Keep your JSON concise by omitting missing properties instead of explicitly setting them to `null`, `undefined`, or an empty string/array. Do not indent your JSON response.
 """
+        return user_text
 
-        return system_text + "\n" + user_text
+
+class Finding(BaseModel):
+    slug: str
+    name: str
+    description: str
+
+
+class Topic(BaseModel):
+    slug: str
+    name: str
+    description: str
+    linked_findings: list[str]
+
+
+class Task(Topic):
+    type: str = "task"
+
+
+class Benchmark(Topic):
+    type: str = "benchmark"
+
+
+class Architecture(Topic):
+    type: str = "architecture"
+
+
+class Model(Topic):
+    type: str = "model"
+
+
+class Method(Topic):
+    type: str = "method"
+
+
+class Dataset(Topic):
+    type: str = "dataset"
+
+
+class PaperAnalysisResponse(BaseModel):
+    findings: list[Finding]
+
+    tasks: list[Task]
+    benchmarks: list[Benchmark]
+    architectures: list[Architecture]
+    models: list[Model]
+    methods: list[Method]
+    datasets: list[Dataset]
+
+    @classmethod
+    def from_response(cls, text: str) -> Self:
+        parsed_text: str
+
+        match = re.search(r"```[^\n]*\n(.*?)```", text, flags=re.DOTALL)
+        if match:
+            parsed_text = match.group(1).strip()
+        else:
+            parsed_text = text.strip()
+
+        structured = cls.model_validate_json(parsed_text)
+        return structured
+
+    def to_response(self) -> str:
+        return self.model_dump_json(exclude_none=True, by_alias=False)
+
+
+# %%
+def get_completion(prompt):
+    res = httpx.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        json={
+            "model": "mistral-large-latest",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            "temperature": 0.1,
+            "top_p": 1,
+            "max_tokens": 8192,
+            "stream": False,
+            "safe_prompt": False,
+            "random_seed": 1337,
+        },
+        headers={
+            "Authorization": f"Bearer {MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        timeout=120,
+    )
+
+    json = res.json()
+
+    return json["choices"][0]["message"]["content"]
 
 
 with open("data/raw/test.json", "r") as f:
@@ -124,4 +231,9 @@ with open("data/raw/test.json", "r") as f:
 
     prompt = PaperAnalysisPrompt(paper=paper)
 
-    print(prompt.compile_prompt())
+    prompt_str = prompt.compile_prompt()
+
+    completion = get_completion(prompt_str)
+
+# %%
+response = PaperAnalysisResponse.from_response(completion)
