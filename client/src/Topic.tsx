@@ -10,22 +10,36 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { ForceGraph3D } from "react-force-graph";
 import SpriteText from "three-spritetext";
 
-const N = 300;
-const myData = {
-  nodes: [...Array(N).keys()].map((i) => ({ id: i, group: i / 12 })),
-  links: [...Array(N).keys()]
-    .filter((id) => id)
-    .map((id) => ({
-      source: id,
-      target: Math.round(Math.random() * (id - 1)),
-    })),
-};
-
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [response, setResponse] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+
+  const findings_map =
+    entity?.findings?.map((finding) => ({
+      id: finding.id || "",
+      name: finding.name,
+      color: "red",
+      type: "finding",
+    })) || [];
+
+  const graphData = {
+    nodes: [
+      {
+        id: entity?.id || "",
+        name: entity?.name || "",
+        color: "blue",
+        type: "topic",
+      },
+      ...findings_map,
+    ],
+    links:
+      entity?.findings?.map((finding) => ({
+        source: entity.id,
+        target: finding.id,
+      })) || [],
+  };
 
   const testMistralEndpoint = async () => {
     setLoading(true);
@@ -114,13 +128,14 @@ export const Topic = () => {
             height={512}
             backgroundColor={"#f9f9f9"}
             linkColor={() => "rgba(0,0,0,0.2)"}
-            graphData={myData}
-            nodeAutoColorBy="group"
+            graphData={graphData}
             nodeThreeObject={(node: {
-              id: string | undefined;
+              id: string;
+              name: string;
               color: string;
+              type: string;
             }) => {
-              const sprite = new SpriteText(node.id);
+              const sprite = new SpriteText(node.name);
               sprite.color = node.color;
               sprite.textHeight = 8;
               return sprite;

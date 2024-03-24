@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { ForceGraph3D } from "react-force-graph";
 import SpriteText from "three-spritetext";
@@ -36,12 +36,12 @@ const TOGGLES = {
 
 const N = 300;
 const myData = {
-  nodes: [...Array(N).keys()].map((i) => ({ id: i, group: i / 12 })),
+  nodes: [...Array(N).keys()].map((i) => ({ id: `${i}`, group: i / 12 })),
   links: [...Array(N).keys()]
     .filter((id) => id)
     .map((id) => ({
-      source: id,
-      target: Math.round(Math.random() * (id - 1)),
+      source: `${id}`,
+      target: `${Math.round(Math.random() * (id - 1))}`,
     })),
 };
 
@@ -49,6 +49,7 @@ function App() {
   const [query, setQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<Topic[]>([]);
   const [toggles, setToggles] = useState<{ [key: string]: boolean }>(TOGGLES);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (query.length === 0) {
@@ -72,6 +73,13 @@ function App() {
       console.error(error);
     }
   }, [query, toggles]);
+
+  const handleClick = useCallback(
+    (node: { id: string | undefined }) => {
+      if (node.id) navigate(`/${encodeURIComponent(node.id)}`);
+    },
+    [navigate]
+  );
 
   return (
     <div className="flex flex-col items-center px-2">
@@ -107,6 +115,7 @@ function App() {
               sprite.textHeight = 8;
               return sprite;
             }}
+            onNodeClick={handleClick}
           />
         </div>
         <div className="flex flex-col space-y-2">
