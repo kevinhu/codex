@@ -1359,6 +1359,7 @@ __metadata:
     eslint: "npm:^8.57.0"
     eslint-plugin-react-hooks: "npm:^4.6.0"
     eslint-plugin-react-refresh: "npm:^0.4.6"
+    marked-react: "npm:^2.0.0"
     postcss: "npm:^8.4.38"
     react: "npm:^18.2.0"
     react-dom: "npm:^18.2.0"
@@ -2872,6 +2873,26 @@ __metadata:
   dependencies:
     once: "npm:~1.3.0"
   checksum: 10c0/b83e5c24b07596f65ce3a09592932ae1b9c91658587d339e9700121bae79c212d91fe60dde7f2ef976309522dae50b04858b8c06f30b770303900fdbee37239c
+  languageName: node
+  linkType: hard
+
+"marked-react@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "marked-react@npm:2.0.0"
+  dependencies:
+    marked: "npm:^6.0.0"
+  peerDependencies:
+    react: ^16.8.0 || >=17.0.0
+  checksum: 10c0/04ba5159e96545b0110cd1f965ef5f29251d6ab783a207eae40f37a12b8811e394bc2f2a9c3575538ebd49de525d1ca1b90a582a551af3ef67c583afa98b2549
+  languageName: node
+  linkType: hard
+
+"marked@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "marked@npm:6.0.0"
+  bin:
+    marked: bin/marked.js
+  checksum: 10c0/ed3a57a2b701f7e95831de94379d21053db808e8114b74dd4ae37802d057636cc957c4cd35e6459117ba7d75e3b2cb2890779f91eadd20d6b79b83f05d360ed1
   languageName: node
   linkType: hard
 
