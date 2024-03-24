@@ -367,6 +367,9 @@ class PaperAnalysisResponse(BaseModel):
 
     def to_response(self) -> str:
         return self.model_dump_json(exclude_none=True, by_alias=False)
+    
+    def all_topics(self):
+        return self.tasks + self.benchmarks + self.architectures + self.models + self.methods + self.datasets
 
 
 class PaperAnalysisRun(BaseModel):
