@@ -14,7 +14,8 @@ import Markdown from "marked-react";
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
-  const [response, setResponse] = useState("");
+  const [introResponse, setIntroResponse] = useState("");
+  const [timelineResponse, setTimelineResponse] = useState("");
   const [testResponse, setTestResponse] = useState<string>("");
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -96,10 +97,66 @@ export const Topic = () => {
     setLoading(false);
   };
 
-  const generateArticle = async () => {
-    setLoading(true);
+  const generateIntro = async (findingsStr: string) => {
     const client = new MistralClient(apiKey);
 
+    try {
+      const content = `Your task is to write a readable markdown intro in the style of a Wikipedia page intro using findings from research papers. Include citations when necessary using markdown links to the paper IDs.
+This should be no longer than 5 sentences. Focus on what the topic is and why it is important & major conclusions.
+
+Here are the findings for the topic "${entity?.name}":
+"""
+${findingsStr}
+"""
+      // `;
+
+      const streamResponse = await client.chatStream({
+        model: "mistral-large-latest",
+        messages: [{ role: "user", content }],
+      });
+
+      setIntroResponse("");
+
+      for await (const chatResponse of streamResponse) {
+        setIntroResponse(
+          (response) => response + chatResponse.choices[0].delta.content
+        );
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+  const generateTimeline = async (findingsStr: string) => {
+    const client = new MistralClient(apiKey);
+
+    try {
+      const content = `Your task is to write a readable markdown timeline article in the style of a Wikipedia page using findings from research papers. Include citations when necessary using markdown links to the paper IDs
+
+Here are the findings for the topic "${entity?.name}", given in chronological order:
+"""
+${findingsStr}
+"""
+      // `;
+
+      const streamResponse = await client.chatStream({
+        model: "mistral-large-latest",
+        messages: [{ role: "user", content }],
+      });
+
+      setTimelineResponse("");
+
+      for await (const chatResponse of streamResponse) {
+        setTimelineResponse(
+          (response) => response + chatResponse.choices[0].delta.content
+        );
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const generateArticle = async () => {
+    setLoading(true);
     try {
       const chronologicallyOrderedFindings =
         entity?.findings?.sort(
@@ -113,28 +170,10 @@ export const Topic = () => {
         .slice(0, 30)
         .join("\n");
 
-      const content = `Your task is to write a readable markdown article in the style of a Wikipedia page using findings from research papers. Include citations when necessary using markdown links to the paper IDs
-
-Here are the findings for the topic "${entity?.name}":
-"""
-${findingsStr}
-"""
-      // `;
-
-      const streamResponse = await client.chatStream({
-        model: "mistral-large-latest",
-        messages: [{ role: "user", content }],
-      });
-
-      setResponse("");
-
-      for await (const chatResponse of streamResponse) {
-        setResponse(
-          (response) => response + chatResponse.choices[0].delta.content
-        );
-      }
-
-      // console.log(response);
+      await Promise.all([
+        generateIntro(findingsStr),
+        generateTimeline(findingsStr),
+      ]);
     } catch (error) {
       console.error(error);
     }
@@ -159,11 +198,9 @@ ${findingsStr}
             <Skeleton height={30} width={240} />
           )}
         </div>
-
         <div>
           {entity ? <p>{entity.description}</p> : <Skeleton count={3} />}
         </div>
-
         <div className="flex flex-col space-y-2 p-4 rounded-md bg-gray-50 border-gray-200 border">
           <p className="text-xl text-gray-700">
             Generate an article for this topic
@@ -182,7 +219,7 @@ ${findingsStr}
           <button
             onClick={generateArticle}
             disabled={loading}
-            className="bg-blue-500 text-white rounded px-3 py-1"
+            className="bg-blue-500 text-white rounded px-3 py-1 disabled:opacity-50"
           >
             Generate
           </button>
@@ -198,9 +235,14 @@ ${findingsStr}
             {testResponse || "What is the best French cheese?"}
           </div>
         </div>
-
-        <div>{response && <Markdown>{response}</Markdown>}</div>
-
+        <div className="markdown">
+          <h1>Introduction</h1>
+          {introResponse && <Markdown>{introResponse}</Markdown>}
+        </div>
+        <div className="markdown">
+          <h1>Timeline</h1>
+          {timelineResponse && <Markdown>{timelineResponse}</Markdown>}
+        </div>
         {graphData && (
           <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
             <ForceGraph3D
@@ -223,7 +265,6 @@ ${findingsStr}
             />
           </div>
         )}
-
         {entity && (
           <div className="flex flex-col space-y-2">
             <h2 className="text-lg">Findings</h2>
