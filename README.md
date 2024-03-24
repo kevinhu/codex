@@ -50,6 +50,10 @@ tar -xf unarXive_230324_open_subset.tar.xz?download=1 -C ./unarXive_230324_open_
 
 - [ ] **Collection of facts about a given entity (of a specific type) -> Article**
 
+### Endpoints for client
+
+- [ ] **Search**
+
 ## Client
 
 ### Search / Graph View
@@ -68,7 +72,7 @@ tar -xf unarXive_230324_open_subset.tar.xz?download=1 -C ./unarXive_230324_open_
 - [ ] Page preceding article generation
   - [ ] See how many facts you have about a topic
   - [ ] See relationships between entities
-- [ ] **Client side article generation with API Key**
+- [x] **Client side article generation with API Key**
 - [ ] **Essential Article types**
   - [ ] Task
     - [ ] Name
