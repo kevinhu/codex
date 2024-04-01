@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { ForceGraph2D, ForceGraph3D } from "react-force-graph";
-import SpriteText from "three-spritetext";
+import { ForceGraph3D } from "react-force-graph";
 import { API_BASE_URL } from "./config";
 import logo from "./logo.jpeg";
 
@@ -16,13 +15,19 @@ export interface Topic {
   created_at: string;
 }
 
+export interface TopicFinding {
+  topic_id: string;
+  finding_id: string;
+  resolved_topic_id: string;
+}
+
 export interface TopicWithFindings extends Topic {
   findings: Finding[];
-  n_deep_data: {
-    type: string;
-    id: string;
-    edge: string | null;
-  }[];
+  data: {
+    topics: Topic[];
+    findings: Finding[];
+    edges: TopicFinding[];
+  };
 }
 
 export interface Finding {
@@ -45,8 +50,6 @@ const TOGGLES = {
   dataset: true,
   benchmark: true,
 };
-
-const N = 300;
 
 type RawGraph = {
   findings: {
@@ -80,11 +83,13 @@ function App() {
       id: topic.id,
       name: topic.name,
       type: "topic",
+      color: "blue",
     }));
     const findings = graph.findings.map((finding) => ({
       id: finding.finding_id,
       name: finding.name,
       type: "finding",
+      color: "red",
     }));
     return {
       nodes: [...topics, ...findings],
@@ -125,7 +130,7 @@ function App() {
   }, [query, toggles]);
 
   const handleClick = useCallback(
-    (node: { id: string | undefined }) => {
+    (node: { id: string | undefined; type: string }) => {
       if (node.id) navigate(`/${encodeURIComponent(node.id)}`);
     },
     [navigate]
@@ -197,14 +202,14 @@ function App() {
         </div>
       </div>
       {/* Graph */}
-      <div className="px-8 md:px-16 mb-16 w-full h-screen">
-        <div className="border border-gray-200 rounded-lg shadow w-full overflow-hidden self-center">
+      <div className="px-8 md:px-16 mb-16 w-full h-screen flex flex-col items-center">
+        <div className="border border-gray-200 rounded-lg shadow overflow-hidden w-fit">
           <ForceGraph3D
             backgroundColor={"#f9f9f9"}
             linkColor={() => "rgba(0,0,0,0.5)"}
             linkWidth={1}
             graphData={mappedGraph}
-            nodeAutoColorBy="type"
+            nodeAutoColorBy="color"
             nodeRelSize={8}
             onNodeClick={handleClick}
             nodeLabel={(node) => {

@@ -1,95 +1,182 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Toaster } from "sonner";
-import MistralClient from "@mistralai/mistralai";
+import OpenAI from "openai";
 import { useLocalStorage } from "usehooks-ts";
-import { Link, useLoaderData } from "react-router-dom";
+import { Link, useLoaderData, useNavigate } from "react-router-dom";
 import { ArrowUUpLeft } from "@phosphor-icons/react";
 import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { ForceGraph3D } from "react-force-graph";
-// import SpriteText from "three-spritetext";
+import { ForceGraph2D } from "react-force-graph";
 import Markdown from "marked-react";
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
+  const navigate = useNavigate();
+
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [introResponse, setIntroResponse] = useState("");
+  const [applicationsResponse, setApplicationsResponse] = useState("");
   const [timelineResponse, setTimelineResponse] = useState("");
   const [testResponse, setTestResponse] = useState<string>("");
+  const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
+  const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
+  const [hoverNode, setHoverNode] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(false);
   const [graphData, setGraphData] = useState<{
-    nodes: { id: string; color: string; type: string }[];
-    links: { source: string; target: string }[];
+    nodes: {
+      id: string;
+      name: string;
+      color: string;
+      type: string;
+      neighbors: { id: string }[];
+      links: { source: string; target: string }[];
+    }[];
+    links: { id: string; source: string; target: string }[];
+  } | null>(null);
+
+  const [topicsGraphData, setTopicsGraphData] = useState<{
+    nodes: {
+      id: string;
+      name: string;
+      color: string;
+      type: string;
+      neighbors: { id: string }[];
+      links: { source: string; target: string }[];
+    }[];
+    links: { id: string; name: string; source: string; target: string }[];
   } | null>(null);
 
   useEffect(() => {
-    const n_deep_data = entity?.n_deep_data;
+    const edges =
+      entity?.data?.edges.map((edge) => ({
+        id: `${edge.finding_id}-${edge.resolved_topic_id}`,
+        source: edge.finding_id,
+        target: edge.resolved_topic_id,
+      })) || [];
 
-    const uniqueMap = new Map<string, object>();
-    if (n_deep_data) {
-      for (const obj of n_deep_data) {
-        if (!uniqueMap.has(obj.id)) {
-          uniqueMap.set(obj.id, obj);
-        }
-      }
-    }
-    const nodes = Array.from(uniqueMap.values()) as {
-      id: string;
-      type: string;
-      edge: string | null;
-    }[];
-
-    const formattedNodes = nodes.map((node) => ({
-      id: node.id,
-      color: node.type === "finding" ? "red" : "blue",
-      type: node.type,
-    }));
-
-    // Split edge by ,
-    const edges = [];
-
-    for (const node of nodes) {
-      if (node.edge) {
-        const edge = node.edge.split(",");
-        const formattedEdge = {
-          source: edge[0],
-          target: edge[1],
-        };
-        edges.push(formattedEdge);
-      }
-    }
+    const nodes = [
+      ...(entity?.data?.topics.map((topic) => ({
+        id: topic.id,
+        name: topic.name,
+        color: "blue",
+        type: "topic",
+        neighbors: [
+          ...edges
+            .filter((edge) => edge.target === topic.id)
+            .map((edge) => ({ id: edge.source })),
+          ...edges
+            .filter((edge) => edge.source === topic.id)
+            .map((edge) => ({ id: edge.target })),
+        ],
+        links: [
+          ...edges.filter((edge) => edge.target === topic.id),
+          ...edges.filter((edge) => edge.source === topic.id),
+        ],
+      })) || []),
+      ...(entity?.data?.findings.map((finding) => ({
+        id: finding.id,
+        name: finding.name,
+        color: "red",
+        type: "finding",
+        neighbors: [
+          ...edges
+            .filter((edge) => edge.target === finding.id)
+            .map((edge) => ({ id: edge.source })),
+          ...edges
+            .filter((edge) => edge.source === finding.id)
+            .map((edge) => ({ id: edge.target })),
+        ],
+        links: [
+          ...edges.filter((edge) => edge.target === finding.id),
+          ...edges.filter((edge) => edge.source === finding.id),
+        ],
+      })) || []),
+    ];
 
     const newGraphData = {
-      nodes: formattedNodes,
+      nodes,
       links: edges,
     };
 
     setGraphData(newGraphData);
-  }, [entity?.n_deep_data]);
 
-  const testMistralEndpoint = async () => {
+    // If a node is a finding, for every two topics it is connected to, add a link between those two topics
+
+    // Start with all findings
+    const findings = entity?.data?.findings || [];
+
+    // Then for each finding, get the topics it is connected to
+    const connectedTopicIds = findings.map((finding) => {
+      const connectedTopics = entity?.data?.edges
+        .filter((edge) => edge.finding_id === finding.id)
+        .map((edge) => ({
+          ...finding,
+          resolved_topic_id: edge.resolved_topic_id,
+        }));
+      return connectedTopics || [];
+    });
+
+    // Then for each pair of topics, add a link between them
+    const connectedTopicPairs = connectedTopicIds.map((connectedTopics) => {
+      const pairs = [];
+      for (let i = 0; i < connectedTopics.length; i++) {
+        for (let j = i + 1; j < connectedTopics.length; j++) {
+          pairs.push([connectedTopics[i], connectedTopics[j]]);
+        }
+      }
+      return pairs;
+    });
+
+    const newTopicsGraphData = {
+      nodes:
+        entity?.data?.topics.map((topic) => ({
+          id: topic.id,
+          name: topic.name,
+          color: "blue",
+          type: "topic",
+          neighbors: [],
+          links: [],
+        })) || [],
+      links:
+        connectedTopicPairs.flat().map(([topic1, topic2]) => ({
+          id: `${topic1.resolved_topic_id}-${topic2.resolved_topic_id}`,
+          name: topic1.name,
+          source: topic1.resolved_topic_id,
+          target: topic2.resolved_topic_id,
+        })) || [],
+    };
+
+    setTopicsGraphData(newTopicsGraphData);
+
+    // Then, we filter for all nodes that are topics
+  }, [entity?.data]);
+
+  const testOpenAIEndpoint = async () => {
     setLoading(true);
-    const client = new MistralClient(apiKey);
+    const openai = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true,
+    });
 
     try {
-      const streamResponse = await client.chatStream({
-        model: "mistral-large-latest",
+      const stream = await openai.chat.completions.create({
         messages: [
+          { role: "system", content: "You are a helpful assistant." },
           { role: "user", content: "What is the best French cheese?" },
         ],
+        model: "gpt-3.5-turbo",
+        stream: true,
       });
 
       setTestResponse("");
 
-      for await (const chatResponse of streamResponse) {
+      for await (const chunk of stream) {
         setTestResponse(
-          (response) => response + chatResponse.choices[0].delta.content
+          (response) => response + (chunk.choices[0].delta.content || "")
         );
       }
-
-      console.log(testResponse);
     } catch (error) {
       console.error(error);
     }
@@ -98,7 +185,10 @@ export const Topic = () => {
   };
 
   const generateIntro = async (findingsStr: string) => {
-    const client = new MistralClient(apiKey);
+    const openai = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true,
+    });
 
     try {
       const content = `Your task is to write a readable markdown intro in the style of a Wikipedia page intro using findings from research papers. Include citations when necessary using markdown links to the paper IDs.
@@ -110,8 +200,9 @@ ${findingsStr}
 """
       // `;
 
-      const streamResponse = await client.chatStream({
-        model: "mistral-large-latest",
+      const streamResponse = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        stream: true,
         messages: [{ role: "user", content }],
       });
 
@@ -119,7 +210,41 @@ ${findingsStr}
 
       for await (const chatResponse of streamResponse) {
         setIntroResponse(
-          (response) => response + chatResponse.choices[0].delta.content
+          (response) => response + (chatResponse.choices[0].delta.content || "")
+        );
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const generateApplications = async (findingsStr: string) => {
+    const openai = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true,
+    });
+
+    try {
+      const content = `Your task is to write a readable markdown section on "Applications" of the given topic in the style of a Wikipedia page section using findings from research papers. Include citations when necessary using markdown links to the paper IDs.
+This should be no longer than 10 sentences. If possible, make separate sections or bullet points for different applications.
+
+Here are the findings for the topic "${entity?.name}":
+"""
+${findingsStr}
+"""
+      // `;
+
+      const streamResponse = await openai.chat.completions.create({
+        messages: [{ role: "user", content }],
+        model: "gpt-3.5-turbo",
+        stream: true,
+      });
+
+      setApplicationsResponse("");
+
+      for await (const chatResponse of streamResponse) {
+        setApplicationsResponse(
+          (response) => response + (chatResponse.choices[0].delta.content || "")
         );
       }
     } catch (error) {
@@ -127,7 +252,10 @@ ${findingsStr}
     }
   };
   const generateTimeline = async (findingsStr: string) => {
-    const client = new MistralClient(apiKey);
+    const openai = new OpenAI({
+      apiKey,
+      dangerouslyAllowBrowser: true,
+    });
 
     try {
       const content = `Your task is to write a readable markdown timeline article in the style of a Wikipedia page using findings from research papers. Include citations when necessary using markdown links to the paper IDs
@@ -138,16 +266,17 @@ ${findingsStr}
 """
       // `;
 
-      const streamResponse = await client.chatStream({
-        model: "mistral-large-latest",
+      const streamResponse = await openai.chat.completions.create({
         messages: [{ role: "user", content }],
+        model: "gpt-3.5-turbo",
+        stream: true,
       });
 
       setTimelineResponse("");
 
       for await (const chatResponse of streamResponse) {
         setTimelineResponse(
-          (response) => response + chatResponse.choices[0].delta.content
+          (response) => response + (chatResponse.choices[0].delta.content || "")
         );
       }
     } catch (error) {
@@ -172,6 +301,7 @@ ${findingsStr}
 
       await Promise.all([
         generateIntro(findingsStr),
+        generateApplications(findingsStr),
         generateTimeline(findingsStr),
       ]);
     } catch (error) {
@@ -180,6 +310,15 @@ ${findingsStr}
 
     setLoading(false);
   };
+
+  const handleClick = useCallback(
+    (node: { id: string | undefined; type: string }) => {
+      if (node.id) navigate(`/${encodeURIComponent(node.id)}`);
+    },
+    [navigate]
+  );
+
+  const NODE_R = 8;
 
   return (
     <div className="flex flex-col items-center px-2">
@@ -224,7 +363,7 @@ ${findingsStr}
             Generate
           </button>
           <button
-            onClick={testMistralEndpoint}
+            onClick={testOpenAIEndpoint}
             disabled={loading}
             className="bg-white text-blue-500 border border-blue-500 rounded px-3 py-1 disabled:opacity-50"
           >
@@ -240,28 +379,86 @@ ${findingsStr}
           {introResponse && <Markdown>{introResponse}</Markdown>}
         </div>
         <div className="markdown">
+          <h1>Applications</h1>
+          {applicationsResponse && <Markdown>{applicationsResponse}</Markdown>}
+        </div>
+        <div className="markdown">
           <h1>Timeline</h1>
           {timelineResponse && <Markdown>{timelineResponse}</Markdown>}
         </div>
         {graphData && (
           <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
-            <ForceGraph3D
+            <ForceGraph2D
               width={512}
               height={512}
+              nodeRelSize={NODE_R}
               backgroundColor={"#f9f9f9"}
               linkColor={() => "rgba(0,0,0,0.2)"}
+              onNodeClick={handleClick}
+              onNodeHover={(node) => {
+                setHighlightNodes(new Set());
+                setHighlightLinks(new Set());
+
+                if (node?.id) {
+                  setHighlightNodes(highlightNodes.add(node.id));
+                  node.neighbors.forEach((neighbor: { id: string }) =>
+                    highlightNodes.add(neighbor.id)
+                  );
+                  setHighlightNodes(highlightNodes);
+
+                  node.links.forEach((link: { id: string }) =>
+                    highlightLinks.add(link.id)
+                  );
+                  setHighlightLinks(highlightLinks);
+                }
+
+                setHoverNode(node?.id || null);
+              }}
+              nodeLabel={(node) => {
+                return `<span class="bg-black rounded-md p-1">${node.name}</span>`;
+              }}
               graphData={graphData}
-              // nodeThreeObject={(node: {
-              //   id: string;
-              //   name: string;
-              //   color: string;
-              //   type: string;
-              // }) => {
-              //   const sprite = new SpriteText(node.name);
-              //   sprite.color = node.color;
-              //   sprite.textHeight = 8;
-              //   return sprite;
-              // }}
+              nodeCanvasObjectMode={(node) =>
+                highlightNodes.has(node.id || "") ? "before" : undefined
+              }
+              nodeCanvasObject={(node, ctx) => {
+                // add ring just for highlighted nodes
+                ctx.beginPath();
+                ctx.arc(
+                  node.x || 0,
+                  node.y || 0,
+                  NODE_R * 1.4,
+                  0,
+                  2 * Math.PI,
+                  false
+                );
+                ctx.fillStyle = node.id === hoverNode ? "red" : "orange";
+                ctx.fill();
+              }}
+              linkWidth={(link) => (highlightLinks.has(link.id) ? 5 : 1)}
+              linkDirectionalParticles={4}
+              linkDirectionalParticleWidth={(link) =>
+                highlightLinks.has(link.id) ? 4 : 0
+              }
+            />
+          </div>
+        )}
+        {topicsGraphData && (
+          <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+            <ForceGraph2D
+              width={512}
+              height={512}
+              nodeRelSize={NODE_R}
+              backgroundColor={"#f9f9f9"}
+              linkColor={() => "rgba(0,0,0,0.2)"}
+              onNodeClick={handleClick}
+              linkLabel={(link) => {
+                return `<span class="bg-black rounded-md p-1">${link.name}</span>`;
+              }}
+              nodeLabel={(node) => {
+                return `<span class="bg-black rounded-md p-1">${node.name}</span>`;
+              }}
+              graphData={topicsGraphData}
             />
           </div>
         )}

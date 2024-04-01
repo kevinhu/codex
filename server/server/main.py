@@ -6,6 +6,7 @@ from psycopg.rows import dict_row
 from vespa.application import Vespa
 import ssl
 import os
+import json
 
 app = FastAPI()
 
@@ -40,7 +41,26 @@ async def read_topic(topic_id: str):
 
                 response = cur.fetchall()
 
+                all_topics = set()
+                all_edges = set()
+                all_findings = set()
+
                 topic = response[0]
+
+                all_topics.add(tuple(sorted(topic.items())))
+
+                # Edges between topics and findings
+                cur.execute(
+                    f"""
+                    SELECT tf.topic_id, tf.finding_id, tf.resolved_topic_id
+                    FROM topic_finding tf
+                    WHERE tf.resolved_topic_id = '{topic_id}';
+                    """
+                )
+
+                edges = cur.fetchall()
+
+                all_edges.update([tuple(sorted(edge.items())) for edge in edges])
 
                 cur.execute(
                     f"""
@@ -54,82 +74,48 @@ async def read_topic(topic_id: str):
 
                 findings = cur.fetchall()
 
-                depth = 3
+                all_findings.update(
+                    [tuple(sorted(finding.items())) for finding in findings]
+                )
 
-                #                     f"""
-                # WITH RECURSIVE related_data AS (
-                #     -- Initial selection from resolved_topic
-                #     SELECT 'resolved_topic' as type, rt.id, 1 AS depth
-                #     FROM resolved_topic rt
-                #     WHERE rt.id = '{topic_id}'
-
-                #     UNION ALL
-
-                #     -- Recursive part: Findings related to resolved_topics, then resolved_topics related to findings
-                #     SELECT
-                #         CASE
-                #             WHEN rd.type = 'resolved_topic' THEN 'finding'
-                #             ELSE 'resolved_topic'
-                #         END as type,
-                #         CASE
-                #             WHEN rd.type = 'resolved_topic' THEN tf.finding_id
-                #             ELSE tf.resolved_topic_id
-                #         END as id,
-                #         rd.depth + 1 AS depth
-                #     FROM related_data rd
-                #     JOIN topic_finding tf ON
-                #         (rd.type = 'resolved_topic' AND tf.resolved_topic_id = rd.id) OR
-                #         (rd.type = 'finding' AND tf.finding_id = rd.id)
-                #     WHERE rd.depth < {depth}
-                # )
-                # SELECT * FROM related_data
-                # WHERE depth <= {depth}
-                # ORDER BY depth, type, id;
-                #                     """
-
+                # Edges between findings and topics
                 cur.execute(
                     f"""
-WITH RECURSIVE related_data AS (
-    -- Initial selection from resolved_topic
--- Initial selection from resolved_topic
-    SELECT 'resolved_topic' as type, rt.id, 1 AS depth, NULL::text as edge
-    FROM resolved_topic rt
-    WHERE rt.id = '{topic_id}'
-
-    UNION ALL
-
-    -- Recursive part: Findings related to resolved_topics, then resolved_topics related to findings
-    SELECT 
-        CASE 
-            WHEN rd.type = 'resolved_topic' THEN 'finding'
-            ELSE 'resolved_topic'
-        END as type,
-        CASE 
-            WHEN rd.type = 'resolved_topic' THEN tf.finding_id
-            ELSE tf.resolved_topic_id
-        END as id,
-        rd.depth + 1 AS depth,
-        CASE
-            WHEN rd.type = 'resolved_topic' THEN rd.id || ',' || tf.finding_id
-            ELSE tf.resolved_topic_id || ',' || rd.id
-        END as edge
-    FROM related_data rd
-    JOIN topic_finding tf ON 
-        (rd.type = 'resolved_topic' AND tf.resolved_topic_id = rd.id) OR 
-        (rd.type = 'finding' AND tf.finding_id = rd.id)
-    WHERE rd.depth < {depth}
-)
-SELECT type, id, edge FROM related_data
-WHERE depth <= {depth}
-ORDER BY depth, type, id;
+                    SELECT tf.topic_id, tf.finding_id, tf.resolved_topic_id
+                    FROM topic_finding tf
+                    WHERE tf.finding_id IN ({", ".join("'" + str(f["id"] + "'") for f in findings)}); 
                     """
                 )
 
-                n_deep_data = cur.fetchall()
+                edges = cur.fetchall()
 
-                # Get all topics and findings N nested levels deep
+                all_edges.update([tuple(sorted(edge.items())) for edge in edges])
 
-                return {**topic, "findings": findings, "n_deep_data": n_deep_data}
+                # Find all topics related to the findings
+                cur.execute(
+                    f"""
+                    SELECT rt.*
+                    FROM resolved_topic rt
+                    JOIN topic_finding tf ON rt.id = tf.resolved_topic_id
+                    WHERE tf.finding_id IN ({", ".join("'" + str(f["id"] + "'") for f in findings)});
+                    """
+                )
+
+                topics = cur.fetchall()
+
+                all_topics.update([tuple(sorted(topic.items())) for topic in topics])
+
+                data = {
+                    "topics": [dict(topic) for topic in all_topics],
+                    "edges": [dict(edge) for edge in all_edges],
+                    "findings": [dict(finding) for finding in all_findings],
+                }
+
+                return {
+                    **topic,
+                    "findings": findings,
+                    "data": data,
+                }
 
     except Exception as e:
         print(e)
