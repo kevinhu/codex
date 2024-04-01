@@ -1,157 +1,26 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { Toaster } from "sonner";
 import OpenAI from "openai";
 import { useLocalStorage } from "usehooks-ts";
-import { Link, useLoaderData, useNavigate } from "react-router-dom";
+import { Link, useLoaderData } from "react-router-dom";
 import { ArrowUUpLeft } from "@phosphor-icons/react";
 import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { ForceGraph2D } from "react-force-graph";
 import Markdown from "marked-react";
+import { TopicsToFindingsGraph } from "./TopicsToFindingsGraph";
+import { TopicsToTopicsGraph } from "./TopicsToTopicsGraph";
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
-  const navigate = useNavigate();
 
   const [apiKey, setApiKey] = useLocalStorage<string>("api_key", "");
   const [introResponse, setIntroResponse] = useState("");
   const [applicationsResponse, setApplicationsResponse] = useState("");
   const [timelineResponse, setTimelineResponse] = useState("");
   const [testResponse, setTestResponse] = useState<string>("");
-  const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
-  const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
-  const [hoverNode, setHoverNode] = useState<string | null>(null);
 
   const [loading, setLoading] = useState<boolean>(false);
-  const [graphData, setGraphData] = useState<{
-    nodes: {
-      id: string;
-      name: string;
-      color: string;
-      type: string;
-      neighbors: { id: string }[];
-      links: { source: string; target: string }[];
-    }[];
-    links: { id: string; source: string; target: string }[];
-  } | null>(null);
-
-  const [topicsGraphData, setTopicsGraphData] = useState<{
-    nodes: {
-      id: string;
-      name: string;
-      color: string;
-      type: string;
-      neighbors: { id: string }[];
-      links: { source: string; target: string }[];
-    }[];
-    links: { id: string; name: string; source: string; target: string }[];
-  } | null>(null);
-
-  useEffect(() => {
-    const edges =
-      entity?.data?.edges.map((edge) => ({
-        id: `${edge.finding_id}-${edge.resolved_topic_id}`,
-        source: edge.finding_id,
-        target: edge.resolved_topic_id,
-      })) || [];
-
-    const nodes = [
-      ...(entity?.data?.topics.map((topic) => ({
-        id: topic.id,
-        name: topic.name,
-        color: "blue",
-        type: "topic",
-        neighbors: [
-          ...edges
-            .filter((edge) => edge.target === topic.id)
-            .map((edge) => ({ id: edge.source })),
-          ...edges
-            .filter((edge) => edge.source === topic.id)
-            .map((edge) => ({ id: edge.target })),
-        ],
-        links: [
-          ...edges.filter((edge) => edge.target === topic.id),
-          ...edges.filter((edge) => edge.source === topic.id),
-        ],
-      })) || []),
-      ...(entity?.data?.findings.map((finding) => ({
-        id: finding.id,
-        name: finding.name,
-        color: "red",
-        type: "finding",
-        neighbors: [
-          ...edges
-            .filter((edge) => edge.target === finding.id)
-            .map((edge) => ({ id: edge.source })),
-          ...edges
-            .filter((edge) => edge.source === finding.id)
-            .map((edge) => ({ id: edge.target })),
-        ],
-        links: [
-          ...edges.filter((edge) => edge.target === finding.id),
-          ...edges.filter((edge) => edge.source === finding.id),
-        ],
-      })) || []),
-    ];
-
-    const newGraphData = {
-      nodes,
-      links: edges,
-    };
-
-    setGraphData(newGraphData);
-
-    // If a node is a finding, for every two topics it is connected to, add a link between those two topics
-
-    // Start with all findings
-    const findings = entity?.data?.findings || [];
-
-    // Then for each finding, get the topics it is connected to
-    const connectedTopicIds = findings.map((finding) => {
-      const connectedTopics = entity?.data?.edges
-        .filter((edge) => edge.finding_id === finding.id)
-        .map((edge) => ({
-          ...finding,
-          resolved_topic_id: edge.resolved_topic_id,
-        }));
-      return connectedTopics || [];
-    });
-
-    // Then for each pair of topics, add a link between them
-    const connectedTopicPairs = connectedTopicIds.map((connectedTopics) => {
-      const pairs = [];
-      for (let i = 0; i < connectedTopics.length; i++) {
-        for (let j = i + 1; j < connectedTopics.length; j++) {
-          pairs.push([connectedTopics[i], connectedTopics[j]]);
-        }
-      }
-      return pairs;
-    });
-
-    const newTopicsGraphData = {
-      nodes:
-        entity?.data?.topics.map((topic) => ({
-          id: topic.id,
-          name: topic.name,
-          color: "blue",
-          type: "topic",
-          neighbors: [],
-          links: [],
-        })) || [],
-      links:
-        connectedTopicPairs.flat().map(([topic1, topic2]) => ({
-          id: `${topic1.resolved_topic_id}-${topic2.resolved_topic_id}`,
-          name: topic1.name,
-          source: topic1.resolved_topic_id,
-          target: topic2.resolved_topic_id,
-        })) || [],
-    };
-
-    setTopicsGraphData(newTopicsGraphData);
-
-    // Then, we filter for all nodes that are topics
-  }, [entity?.data]);
 
   const testOpenAIEndpoint = async () => {
     setLoading(true);
@@ -311,15 +180,6 @@ ${findingsStr}
     setLoading(false);
   };
 
-  const handleClick = useCallback(
-    (node: { id: string | undefined; type: string }) => {
-      if (node.id) navigate(`/${encodeURIComponent(node.id)}`);
-    },
-    [navigate]
-  );
-
-  const NODE_R = 8;
-
   return (
     <div className="flex flex-col items-center px-2">
       <Toaster />
@@ -386,82 +246,13 @@ ${findingsStr}
           <h1>Timeline</h1>
           {timelineResponse && <Markdown>{timelineResponse}</Markdown>}
         </div>
-        {graphData && (
-          <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
-            <ForceGraph2D
-              width={512}
-              height={512}
-              nodeRelSize={NODE_R}
-              backgroundColor={"#f9f9f9"}
-              linkColor={() => "rgba(0,0,0,0.2)"}
-              onNodeClick={handleClick}
-              onNodeHover={(node) => {
-                setHighlightNodes(new Set());
-                setHighlightLinks(new Set());
+        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+          <TopicsToFindingsGraph />
+        </div>
+        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+          <TopicsToTopicsGraph />
+        </div>
 
-                if (node?.id) {
-                  setHighlightNodes(highlightNodes.add(node.id));
-                  node.neighbors.forEach((neighbor: { id: string }) =>
-                    highlightNodes.add(neighbor.id)
-                  );
-                  setHighlightNodes(highlightNodes);
-
-                  node.links.forEach((link: { id: string }) =>
-                    highlightLinks.add(link.id)
-                  );
-                  setHighlightLinks(highlightLinks);
-                }
-
-                setHoverNode(node?.id || null);
-              }}
-              nodeLabel={(node) => {
-                return `<span class="bg-black rounded-md p-1">${node.name}</span>`;
-              }}
-              graphData={graphData}
-              nodeCanvasObjectMode={(node) =>
-                highlightNodes.has(node.id || "") ? "before" : undefined
-              }
-              nodeCanvasObject={(node, ctx) => {
-                // add ring just for highlighted nodes
-                ctx.beginPath();
-                ctx.arc(
-                  node.x || 0,
-                  node.y || 0,
-                  NODE_R * 1.4,
-                  0,
-                  2 * Math.PI,
-                  false
-                );
-                ctx.fillStyle = node.id === hoverNode ? "red" : "orange";
-                ctx.fill();
-              }}
-              linkWidth={(link) => (highlightLinks.has(link.id) ? 5 : 1)}
-              linkDirectionalParticles={4}
-              linkDirectionalParticleWidth={(link) =>
-                highlightLinks.has(link.id) ? 4 : 0
-              }
-            />
-          </div>
-        )}
-        {topicsGraphData && (
-          <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
-            <ForceGraph2D
-              width={512}
-              height={512}
-              nodeRelSize={NODE_R}
-              backgroundColor={"#f9f9f9"}
-              linkColor={() => "rgba(0,0,0,0.2)"}
-              onNodeClick={handleClick}
-              linkLabel={(link) => {
-                return `<span class="bg-black rounded-md p-1">${link.name}</span>`;
-              }}
-              nodeLabel={(node) => {
-                return `<span class="bg-black rounded-md p-1">${node.name}</span>`;
-              }}
-              graphData={topicsGraphData}
-            />
-          </div>
-        )}
         {entity && (
           <div className="flex flex-col space-y-2">
             <h2 className="text-lg">Findings</h2>
