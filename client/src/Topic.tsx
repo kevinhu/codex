@@ -8,8 +8,10 @@ import { TopicWithFindings } from "./App";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import Markdown from "marked-react";
-import { TopicsToFindingsGraph } from "./TopicsToFindingsGraph";
+// import { TopicsToFindingsGraph } from "./TopicsToFindingsGraph";
 import { TopicsToTopicsGraph } from "./TopicsToTopicsGraph";
+
+const SLD = "http://localhost:5173";
 
 export const Topic = () => {
   const { entity } = useLoaderData() as { entity: TopicWithFindings | null };
@@ -53,7 +55,7 @@ export const Topic = () => {
     setLoading(false);
   };
 
-  const generateIntro = async (findingsStr: string) => {
+  const generateIntro = async (findingsStr: string, topicsStr: string) => {
     const openai = new OpenAI({
       apiKey,
       dangerouslyAllowBrowser: true,
@@ -67,6 +69,14 @@ Here are the findings for the topic "${entity?.name}":
 """
 ${findingsStr}
 """
+
+These findings reference other topics. Here are a list of those topics:
+"""
+${topicsStr}
+"""
+
+Whenever you mention a topic, include a link to the topic's page. These links should be in the format [topic name](${SLD}/:id)
+Include citations when necessary using markdown links to the paper IDs. These links should be in the format [paper ID](https://arxiv.org/abs/:paper_id)
       // `;
 
       const streamResponse = await openai.chat.completions.create({
@@ -87,7 +97,10 @@ ${findingsStr}
     }
   };
 
-  const generateApplications = async (findingsStr: string) => {
+  const generateApplications = async (
+    findingsStr: string,
+    topicsStr: string
+  ) => {
     const openai = new OpenAI({
       apiKey,
       dangerouslyAllowBrowser: true,
@@ -101,6 +114,15 @@ Here are the findings for the topic "${entity?.name}":
 """
 ${findingsStr}
 """
+
+These findings reference other topics. Here are a list of those topics:
+"""
+${topicsStr}
+"""
+
+Whenever you mention a topic, include a link to the topic's page. These links should be in the format [topic name](${SLD}/:id)
+Include citations when necessary using markdown links to the paper IDs. These links should be in the format [paper ID](https://arxiv.org/abs/:paper_id)
+
       // `;
 
       const streamResponse = await openai.chat.completions.create({
@@ -120,19 +142,27 @@ ${findingsStr}
       console.error(error);
     }
   };
-  const generateTimeline = async (findingsStr: string) => {
+  const generateTimeline = async (findingsStr: string, topicsStr: string) => {
     const openai = new OpenAI({
       apiKey,
       dangerouslyAllowBrowser: true,
     });
 
     try {
-      const content = `Your task is to write a readable markdown timeline article in the style of a Wikipedia page using findings from research papers. Include citations when necessary using markdown links to the paper IDs
+      const content = `Your task is to write a readable markdown timeline article in the style of a Wikipedia page using findings from research papers.
 
 Here are the findings for the topic "${entity?.name}", given in chronological order:
 """
 ${findingsStr}
 """
+
+These findings reference other topics. Here are a list of those topics:
+"""
+${topicsStr}
+"""
+
+Whenever you mention a topic, include a link to the topic's page. These links should be in the format [topic name](${SLD}/:id)
+Include citations when necessary using markdown links to the paper IDs. These links should be in the format [paper ID](https://arxiv.org/abs/:paper_id)
       // `;
 
       const streamResponse = await openai.chat.completions.create({
@@ -165,13 +195,22 @@ ${findingsStr}
 
       const findingsStr = chronologicallyOrderedFindings
         .map((finding) => JSON.stringify(finding))
-        .slice(0, 30)
         .join("\n");
 
+      const topicsStr =
+        entity?.data.topics
+          .map((topic) =>
+            JSON.stringify({
+              ...topic,
+              id: encodeURIComponent(topic.id) || "",
+            })
+          )
+          .join("\n") || "";
+
       await Promise.all([
-        generateIntro(findingsStr),
-        generateApplications(findingsStr),
-        generateTimeline(findingsStr),
+        generateIntro(findingsStr, topicsStr),
+        generateApplications(findingsStr, topicsStr),
+        generateTimeline(findingsStr, topicsStr),
       ]);
     } catch (error) {
       console.error(error);
@@ -246,9 +285,9 @@ ${findingsStr}
           <h1>Timeline</h1>
           {timelineResponse && <Markdown>{timelineResponse}</Markdown>}
         </div>
-        <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
+        {/* <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
           <TopicsToFindingsGraph />
-        </div>
+        </div> */}
         <div className="border border-gray-200 rounded w-fit overflow-hidden self-center">
           <TopicsToTopicsGraph />
         </div>

@@ -15,7 +15,10 @@ interface Node extends Topic {
   links: Link[];
 }
 
+const GRAY_200 = "rgb(229 231 235)";
 const GRAY_400 = "rgb(156 163 175)";
+const EMPHASIZED = GRAY_400;
+const DEEMPHASIZED = GRAY_200;
 
 const LinkLabel: React.FC<{ link: Link }> = ({ link }) => {
   return (
@@ -202,9 +205,9 @@ export const TopicsToTopicsGraph = () => {
           nodeColor={(node) =>
             selectedNodes.size > 0
               ? selectedNodes.has(node.id) || highlightNodes.has(node.id)
-                ? GRAY_400
-                : "transparent"
-              : GRAY_400
+                ? EMPHASIZED
+                : DEEMPHASIZED
+              : EMPHASIZED
           }
           graphData={topicsGraphData}
           onBackgroundClick={() => {

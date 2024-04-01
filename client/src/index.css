@@ -9,9 +9,21 @@
 .markdown h2 {
   @apply text-xl font-medium text-gray-600 my-2;
 }
+.markdown h3 {
+  @apply text-lg font-medium text-gray-600 my-2;
+}
+.markdown h4 {
+  @apply text-base font-medium text-gray-600 my-2;
+}
+.markdown h5 {
+  @apply text-base font-medium text-gray-600 my-2;
+}
 .markdown p {
   @apply text-base text-gray-700;
 }
 .markdown code {
   @apply bg-gray-100 p-2 rounded;
+}
+.markdown a {
+  @apply text-blue-500 underline;
 }
